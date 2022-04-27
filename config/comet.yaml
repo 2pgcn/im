@@ -1,0 +1,22 @@
+comet:
+  server:
+    name: comet0
+    addrs: [0.0.0.0]
+    port: 9000
+    maxConnections: 1000000
+    goroutines: 0
+  queue:
+    topic: topic # topic name example server.name-queue.topic
+    group: group  # group name example server.name-queue.group
+    brokers: [0,1]
+  ssl:
+    enabled: false
+    key: /etc/letsencrypt/live/example.com/privkey.pem
+    cert: /etc/letsencrypt/live/example.com/fullchain.pem
+  tcp:
+    sendBuf: 1024
+    recvBuf: 1024
+    keepalive: false
+  logicClientGrpc:
+    addr: "http://127.0.0.1:9000"
+    timeout: "5"

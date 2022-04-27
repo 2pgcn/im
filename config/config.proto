@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package config;
+
+option go_package = "github.com/php403/gameim/config;config";
+
+message CometConfig{
+  message serverMsg{
+    string name = 1;
+     repeated string addrs = 2;
+     int32 port = 3;
+     uint32 max_connections = 4; //max conn nums
+     uint32 goroutines = 5; //go routines nums default is 0 means use cpu nums
+  }
+  //todo 目前仅为kafka
+  message queueMsg{
+     repeated string topic = 1;
+     string group = 2;
+     repeated string brokers = 3;
+     int32 partition = 4;
+  }
+  message sslMsg{
+    bool enable = 1;
+    string key = 2;
+    string cert = 3;
+  }
+  message tcpMsg{
+    uint64 send_buf =1;
+    uint64 recv_buf = 2;
+    bool keepalive = 3;
+  }
+  message logicClientGrpc{
+    string addr = 1;
+    uint32 timeout = 2;
+  }
+  serverMsg server = 1;
+  queueMsg queue = 2;
+  sslMsg ssl = 3;
+  tcpMsg tcp = 4;
+  logicClientGrpc logic_client_grpc = 5;
+
+}
+
+message LogicConfig{
+  message grpcServer{
+     string host = 1;
+     int32 port = 2;
+  }
+
+}
