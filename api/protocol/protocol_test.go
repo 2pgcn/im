@@ -20,13 +20,13 @@ func BenchmarkTest(b *testing.B) {
 		if err != nil {
 			b.Fatal(err)
 		}
-		p1, err := DecodeFromBytes(data)
-		if err != nil {
-			b.Fatal(err)
-		}
-		if p1.Version != p.Version || p1.Op != p.Op || p1.Checksum != p.Checksum || p1.Seq != p.Seq || string(p1.Data) != string(p.Data) {
-			b.Fatalf("not equal %+v", p1)
-		}
+		//p1, err := DecodeFromBytes(data)
+		//if err != nil {
+		//	b.Fatal(err)
+		//}
+		//if p1.Version != p.Version || p1.Op != p.Op || p1.Checksum != p.Checksum || p1.Seq != p.Seq || string(p1.Data) != string(p.Data) {
+		//	b.Fatalf("not equal %+v", p1)
+		//}
 	}
 	runtime.GC()
 }

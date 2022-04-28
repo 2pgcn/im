@@ -1,6 +1,7 @@
 package comet
 
 import (
+	"fmt"
 	"github.com/Shopify/sarama"
 	"github.com/php403/gameim/config"
 	"time"
@@ -15,6 +16,7 @@ func NewConsumerGroupHandler(c *config.CometConfigQueueMsg) (consumer sarama.Con
 	kconfig.Consumer.Offsets.AutoCommit.Interval = 1 * time.Second // 间隔
 	kconfig.Consumer.Offsets.Initial = sarama.OffsetNewest
 	kconfig.Consumer.Offsets.Retry.Max = 3
+	fmt.Println(c)
 	return sarama.NewConsumerGroup(c.Brokers, c.Group, kconfig)
 
 }

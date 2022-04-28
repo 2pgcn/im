@@ -1,14 +1,14 @@
 comet:
   server:
     name: comet0
-    addrs: [0.0.0.0]
+    addrs: [127.0.0.1:9001]
     port: 9000
     maxConnections: 1000000
     goroutines: 0
   queue:
     topic: topic # topic name example server.name-queue.topic
     group: group  # group name example server.name-queue.group
-    brokers: [0,1]
+    brokers: ["192.168.1.123:9092"]
   ssl:
     enabled: false
     key: /etc/letsencrypt/live/example.com/privkey.pem
@@ -18,5 +18,5 @@ comet:
     recvBuf: 1024
     keepalive: false
   logicClientGrpc:
-    addr: "http://127.0.0.1:9000"
-    timeout: "5"
+    addr: "127.0.0.1:9000"
+    timeout: 5

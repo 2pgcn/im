@@ -33,7 +33,7 @@ func (s *server) OnAuth(ctx context.Context, in *pb.AuthReq) (*pb.AuthReply, err
 	return &pb.AuthReply{
 		Uid:    uid,
 		AreaId: uint64(1),
-		RoomId: online,
+		RoomId: uid % 10000,
 	}, nil
 }
 

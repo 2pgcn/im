@@ -76,6 +76,24 @@ func (p *Proto) SerializeTo(bytes []byte) (err error) {
 	return
 }
 
+func (p *Proto) WriteTcp(writer *bufio.Writer) (err error) {
+	b := make([]byte, HeaderLen+len(p.Data))
+	if len(b) < HeaderLen {
+		return ErrInvalidBuffer
+	}
+	binary.BigEndian.PutUint32(b[0:packSizeOffset], uint32(len(p.Data)+HeaderLen))
+	binary.BigEndian.PutUint16(b[packSizeOffset:headerSizeOffset], HeaderLen)
+	binary.BigEndian.PutUint16(b[headerSizeOffset:versionSizeOffset], p.Version)
+	binary.BigEndian.PutUint16(b[versionSizeOffset:checksumSizeOffset], p.Checksum)
+	binary.BigEndian.PutUint16(b[checksumSizeOffset:opSizeOffset], p.Op)
+	binary.BigEndian.PutUint16(b[opSizeOffset:seqSizeOffset], p.Seq)
+	copy(p.Data, b[seqSizeOffset:])
+	if err = binary.Write(writer, binary.BigEndian, b); err != nil {
+		return
+	}
+	return writer.Flush()
+}
+
 func (p *Proto) DecodeFromBytes(b *bufio.Reader) (err error) {
 	bufio.NewReader(bytes.NewReader([]byte{}))
 	headBuf := make([]byte, HeaderLen)

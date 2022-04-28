@@ -3,6 +3,7 @@ package comet
 import (
 	"bufio"
 	"context"
+	"github.com/golang/protobuf/proto"
 	"github.com/php403/gameim/api/comet"
 	"github.com/php403/gameim/api/logic"
 	"github.com/php403/gameim/api/protocol"
@@ -20,7 +21,7 @@ const appid = "app01"
 
 type Server struct {
 	ctx   context.Context
-	conf  config.CometConfig
+	conf  *config.CometConfig
 	Name  string
 	log   *zap.SugaredLogger
 	Apps  map[string]*App
@@ -30,23 +31,23 @@ type Server struct {
 
 func NewServer(ctx context.Context, log *zap.SugaredLogger, config *config.CometConfig) {
 	server := &Server{
-		ctx:   ctx,
-		Name:  config.Server.Name,
-		log:   log,
-		Apps:  map[string]*App{},
+		ctx:  ctx,
+		Name: config.Server.Name,
+		log:  log,
+		Apps: map[string]*App{},
+		conf: config,
+		//todo 绑到app下
 		logic: newLogicClient(ctx, config.LogicClientGrpc),
 	}
 	//启动消费队列消费
 	for _, v := range config.Server.Addrs {
 		addr := v
 		go func() {
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				default:
-					server.bindConn(ctx, addr)
-				}
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				server.bindConn(ctx, addr)
 			}
 		}()
 	}
@@ -68,12 +69,13 @@ func (s *Server) bindConn(ctx context.Context, host string) {
 		return
 	}
 
-	if conn, err = listener.AcceptTCP(); err != nil {
-		s.log.Errorf("accept comet error %v", zap.Error(err))
-		return
+	for {
+		if conn, err = listener.AcceptTCP(); err != nil {
+			s.log.Errorf("accept comet error %v", zap.Error(err))
+			return
+		}
+		go s.handleComet(ctx, conn)
 	}
-	go s.handleComet(ctx, conn)
-	return
 }
 
 func (s *Server) handleComet(ctx context.Context, conn net.Conn) {
@@ -83,12 +85,12 @@ func (s *Server) handleComet(ctx context.Context, conn net.Conn) {
 	user.WriteBuf = bufio.NewWriter(conn)
 	//todo 用户登录后加入最小堆(nginx采用红黑树event)
 	//获取用户消息
-	proto := &protocol.Proto{}
-	if err := proto.DecodeFromBytes(user.ReadBuf); err != nil {
+	p := &protocol.Proto{}
+	if err := p.DecodeFromBytes(user.ReadBuf); err != nil {
 		s.log.Errorf("protocol.DecodeFromBytes(user.ReadBuf, &user.Msg) error(%v)", err)
 		return
 	}
-	if proto.Op != protocol.OpAuth {
+	if p.Op != protocol.OpAuth {
 		//todo return client err msg
 		err := conn.Close()
 		if err != nil {
@@ -97,18 +99,19 @@ func (s *Server) handleComet(ctx context.Context, conn net.Conn) {
 		s.log.Errorf("protocol.Op != protocol.OpLogin")
 		return
 	}
-	grpcCtx, cancal := context.WithTimeout(s.ctx, time.Duration(s.conf.LogicClientGrpc.Timeout)*time.Second)
-	defer cancal()
+	//todo 配置超时时间
+	grpcCtx, cancel := context.WithTimeout(s.ctx, 1*time.Second)
+	defer cancel()
 	authReply, err := s.logic.OnAuth(grpcCtx, &logic.AuthReq{
-		Token: string(proto.Data),
+		Token: string(p.Data),
 	})
 	if err != nil {
+		s.log.Errorf("s.logic.OnAuth error(%v)", err)
 		err = conn.Close()
 		if err != nil {
 			s.log.Errorf("conn.Close() error(%v)", err)
 			return
 		}
-		s.log.Errorf("conn.Close() error(%v)", err)
 		return
 	}
 	//appid 先写死,后面通过proto.data里解码获取
@@ -120,7 +123,7 @@ func (s *Server) handleComet(ctx context.Context, conn net.Conn) {
 	var ok bool
 	s.Lock.RLock()
 	if app, ok = s.Apps[appid]; !ok {
-		app, err = NewApp(ctx, appid)
+		app, err = NewApp(ctx, appid, s.conf.Queue)
 		if err != nil {
 			return
 		}
@@ -131,10 +134,52 @@ func (s *Server) handleComet(ctx context.Context, conn net.Conn) {
 	bucket := app.GetBucket(user.Uid)
 	bucket.Area(user.AreaId).JoinArea(user)
 	bucket.Room(user.RoomId).JoinRoom(user)
+
+	//发送用户登录成功消息
+	var writeProto *protocol.Proto
+	writeProto = &protocol.Proto{
+		Version:  1,
+		Op:       protocol.OpAuthReply,
+		Checksum: 0,
+		Seq:      0, //todo
+	}
+	writeProto.Data, _ = proto.Marshal(authReply)
+	if err = writeProto.WriteTcp(user.WriteBuf); err != nil {
+		s.log.Errorf("writeProto.EncodeTo(user.WriteBuf) error(%v)", err)
+		return
+	}
+	//发送消息
+	go func() {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msg := <-user.msgQueue:
+				data, err := proto.Marshal(msg)
+				if err != nil {
+					s.log.Errorf("proto.Marshal(msg) error(%v)", err)
+					break
+				}
+				writeProto = &protocol.Proto{
+					Version:  1,
+					Op:       protocol.OpSendAreaMsg,
+					Checksum: 0,
+					Seq:      0, //todo
+					Data:     data,
+				}
+				if err = writeProto.WriteTcp(user.WriteBuf); err != nil {
+					s.log.Errorf("writeProto.EncodeTo(user.WriteBuf) error(%v)", err)
+					break
+				}
+			default:
+
+			}
+		}
+	}()
 	//不断读消息
 	var sendType comet.Type
-	for err = proto.DecodeFromBytes(user.ReadBuf); err == nil; {
-		switch proto.Op {
+	for err = p.DecodeFromBytes(user.ReadBuf); err == nil; {
+		switch p.Op {
 		case protocol.OpHeartbeat:
 			//todo 添加到最小堆
 			continue
@@ -142,29 +187,29 @@ func (s *Server) handleComet(ctx context.Context, conn net.Conn) {
 			//删除用户对应信息
 			return
 		case protocol.OpSendAreaMsg | protocol.OpSendRoomMsg | protocol.OpSendMsg:
-			if proto.Op == protocol.OpSendAreaMsg {
+			if p.Op == protocol.OpSendAreaMsg {
 				sendType = comet.Type_AREA
 			}
-			if proto.Op == protocol.OpSendRoomMsg {
+			if p.Op == protocol.OpSendRoomMsg {
 				sendType = comet.Type_ROOM
 			}
-			if proto.Op == protocol.OpSendMsg {
+			if p.Op == protocol.OpSendMsg {
 				sendType = comet.Type_PUSH
 			}
 			_, err = s.logic.OnMessage(ctx, &logic.MessageReq{
 				Type:     sendType,
 				SendId:   user.Uid,
 				ToId:     user.AreaId,
-				Msg:      proto.Data,
+				Msg:      p.Data,
 				CometKey: s.Name,
 			})
 			if err != nil {
-				s.log.Errorf("s.logic.OnMessage(ctx, &logic.MessageReq{Type:comet.Type_AREA,SendId:%d,ToId:%d,Msg:%s,CometKey:%s}) error(%v)", user.Uid, user.AreaId, string(proto.Data), s.Name, err)
+				s.log.Errorf("s.logic.OnMessage(ctx, &logic.MessageReq{Type:comet.Type_AREA,SendId:%d,ToId:%d,Msg:%s,CometKey:%s}) error(%v)", user.Uid, user.AreaId, string(p.Data), s.Name, err)
 				return
 			}
 		default:
 			//todo send msg to user
-			s.log.Errorf("protocol.Op error(%v)", proto.Op)
+			s.log.Errorf("protocol.Op error(%v)", p.Op)
 		}
 
 	}

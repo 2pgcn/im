@@ -26,8 +26,8 @@ func (a *App) GetBucketIndex(userid uint64) int {
 	return int(userid % uint64(a.bucketIdx))
 }
 
-// NewApp todo 暂时写死app 需要改为从存储中获取
-func NewApp(ctx context.Context, appid string) (*App, error) {
+// NewApp todo 暂时写死app 需要改为从存储中获取 config改成app config
+func NewApp(ctx context.Context, appid string, config *config.CometConfigQueueMsg) (*App, error) {
 	app := &App{
 		ctx:       ctx,
 		Appid:     appid,
@@ -37,7 +37,7 @@ func NewApp(ctx context.Context, appid string) (*App, error) {
 	for i := 0; i < 1024; i++ {
 		app.Buckets[i] = NewBucket()
 	}
-	consumer, err := NewConsumerGroupHandler(app.config)
+	consumer, err := NewConsumerGroupHandler(config)
 	if err != nil {
 		return nil, err
 	}

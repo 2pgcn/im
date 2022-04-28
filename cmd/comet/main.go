@@ -8,6 +8,8 @@ import (
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 	"log"
+	"os"
+	"os/signal"
 )
 
 var rootCmd = &cobra.Command{
@@ -28,6 +30,17 @@ func main() {
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
 	}
-	sugaredLogger := zap.NewExample().Sugar()
-	comet.NewServer(context.Background(), sugaredLogger, cometConfig)
+	devLog, _ := zap.NewDevelopment()
+	sugaredLogger := devLog.Sugar()
+	ctx, cancel := context.WithCancel(context.Background())
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, os.Interrupt, os.Kill)
+	comet.NewServer(ctx, sugaredLogger, cometConfig)
+	for {
+		select {
+		case <-signals:
+			cancel()
+			return
+		}
+	}
 }
