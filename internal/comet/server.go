@@ -11,7 +11,6 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/keepalive"
 	"net"
 	"sync"
 	"time"
@@ -100,7 +99,7 @@ func (s *Server) handleComet(ctx context.Context, conn net.Conn) {
 		return
 	}
 	//todo 配置超时时间
-	grpcCtx, cancel := context.WithTimeout(s.ctx, 1*time.Second)
+	grpcCtx, cancel := context.WithTimeout(s.ctx, 30*time.Second)
 	defer cancel()
 	authReply, err := s.logic.OnAuth(grpcCtx, &logic.AuthReq{
 		Token: string(p.Data),
@@ -121,20 +120,21 @@ func (s *Server) handleComet(ctx context.Context, conn net.Conn) {
 	user.RoomId = authReply.RoomId
 	var app *App
 	var ok bool
-	s.Lock.RLock()
+	s.Lock.Lock()
 	if app, ok = s.Apps[appid]; !ok {
-		app, err = NewApp(ctx, appid, s.conf.Queue)
+		app, err = NewApp(ctx, appid, s.conf.Queue, s.log)
 		if err != nil {
+			s.log.Errorf("NewApp(ctx, %s, %s) error(%v)", appid, s.conf.Queue, err)
 			return
 		}
 		s.Apps[appid] = app
 	}
-	s.Lock.RUnlock()
+	s.log.Debugf("test appid %s", appid)
+	s.Lock.Unlock()
 	//加入区服,加入房间
 	bucket := app.GetBucket(user.Uid)
-	bucket.Area(user.AreaId).JoinArea(user)
-	bucket.Room(user.RoomId).JoinRoom(user)
-
+	//bucket.users
+	bucket.PutUser(user)
 	//发送用户登录成功消息
 	var writeProto *protocol.Proto
 	writeProto = &protocol.Proto{
@@ -143,6 +143,7 @@ func (s *Server) handleComet(ctx context.Context, conn net.Conn) {
 		Checksum: 0,
 		Seq:      0, //todo
 	}
+	s.log.Debugf("auth success  : %v", authReply)
 	writeProto.Data, _ = proto.Marshal(authReply)
 	if err = writeProto.WriteTcp(user.WriteBuf); err != nil {
 		s.log.Errorf("writeProto.EncodeTo(user.WriteBuf) error(%v)", err)
@@ -156,6 +157,7 @@ func (s *Server) handleComet(ctx context.Context, conn net.Conn) {
 				return
 			case msg := <-user.msgQueue:
 				data, err := proto.Marshal(msg)
+				s.log.Debugf("recv msg : %v", msg)
 				if err != nil {
 					s.log.Errorf("proto.Marshal(msg) error(%v)", err)
 					break
@@ -167,18 +169,21 @@ func (s *Server) handleComet(ctx context.Context, conn net.Conn) {
 					Seq:      0, //todo
 					Data:     data,
 				}
+				s.log.Debugf("writeProto : %v", writeProto)
 				if err = writeProto.WriteTcp(user.WriteBuf); err != nil {
 					s.log.Errorf("writeProto.EncodeTo(user.WriteBuf) error(%v)", err)
 					break
 				}
-			default:
-
 			}
 		}
 	}()
 	//不断读消息
 	var sendType comet.Type
-	for err = p.DecodeFromBytes(user.ReadBuf); err == nil; {
+	for {
+		err = p.DecodeFromBytes(user.ReadBuf)
+		if err != nil {
+			continue
+		}
 		switch p.Op {
 		case protocol.OpHeartbeat:
 			//todo 添加到最小堆
@@ -186,14 +191,17 @@ func (s *Server) handleComet(ctx context.Context, conn net.Conn) {
 		case protocol.OpDisconnect:
 			//删除用户对应信息
 			return
-		case protocol.OpSendAreaMsg | protocol.OpSendRoomMsg | protocol.OpSendMsg:
+		case protocol.OpSendAreaMsg, protocol.OpSendRoomMsg, protocol.OpSendMsg:
 			if p.Op == protocol.OpSendAreaMsg {
+				p.Op = protocol.OpSendAreaMsgReply
 				sendType = comet.Type_AREA
 			}
 			if p.Op == protocol.OpSendRoomMsg {
+				p.Op = protocol.OpSendMsgRoomReply
 				sendType = comet.Type_ROOM
 			}
 			if p.Op == protocol.OpSendMsg {
+				p.Op = protocol.OpSendMsgReply
 				sendType = comet.Type_PUSH
 			}
 			_, err = s.logic.OnMessage(ctx, &logic.MessageReq{
@@ -209,7 +217,7 @@ func (s *Server) handleComet(ctx context.Context, conn net.Conn) {
 			}
 		default:
 			//todo send msg to user
-			s.log.Errorf("protocol.Op error(%v)", p.Op)
+			s.log.Errorf("protocol.Op error(proto:%v)", p)
 		}
 
 	}
@@ -243,11 +251,11 @@ func newLogicClient(ctx context.Context, c *config.CometConfigLogicClientGrpc) l
 		grpc.WithInitialConnWindowSize(grpcInitialConnWindowSize),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcMaxCallMsgSize)),
 		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(grpcMaxSendMsgSize)),
-		grpc.WithKeepaliveParams(keepalive.ClientParameters{
-			Time:                grpcKeepAliveTime,
-			Timeout:             grpcKeepAliveTimeout,
-			PermitWithoutStream: true,
-		}),
+		//grpc.WithKeepaliveParams(keepalive.ClientParameters{
+		//	Time:                grpcKeepAliveTime,
+		//	Timeout:             grpcKeepAliveTimeout,
+		//	PermitWithoutStream: true,
+		//}),
 		grpc.WithTransportCredentials(insecure.NewCredentials()), //todo 安全验证
 	)
 	if err != nil {

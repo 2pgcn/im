@@ -14,7 +14,7 @@ message CometConfig{
   }
   //todo 目前仅为kafka
   message queueMsg{
-     repeated string topic = 1;
+     string topic = 1;
      string group = 2;
      repeated string brokers = 3;
      int32 partition = 4;

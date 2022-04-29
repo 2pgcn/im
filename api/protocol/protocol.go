@@ -87,10 +87,11 @@ func (p *Proto) WriteTcp(writer *bufio.Writer) (err error) {
 	binary.BigEndian.PutUint16(b[versionSizeOffset:checksumSizeOffset], p.Checksum)
 	binary.BigEndian.PutUint16(b[checksumSizeOffset:opSizeOffset], p.Op)
 	binary.BigEndian.PutUint16(b[opSizeOffset:seqSizeOffset], p.Seq)
-	copy(p.Data, b[seqSizeOffset:])
+	copy(b[seqSizeOffset:], p.Data)
 	if err = binary.Write(writer, binary.BigEndian, b); err != nil {
 		return
 	}
+
 	return writer.Flush()
 }
 

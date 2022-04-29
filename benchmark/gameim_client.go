@@ -44,7 +44,6 @@ const (
 
 const (
 	rawHeaderLen = uint16(16)
-	heart        = 240 * time.Second
 )
 
 // AuthToken auth token.
@@ -132,11 +131,12 @@ func startClient(key int64) {
 		log.Errorf("tcpWriteProto() error(%v)", err)
 		return
 	}
-	if err = p.DecodeFromBytes(rd); err != nil && p.Op != OpAuthReply {
-		log.Errorf("auth reply %v tcpReadProto() error(%v)", p, err)
-		return
+	for {
+		if err = p.DecodeFromBytes(rd); err == nil && p.Op == OpAuthReply {
+			log.Infof("key:%d auth ok, p: %v", key, p)
+			break
+		}
 	}
-	log.Infof("key:%d auth ok, p: %v", key, p)
 	seq++
 	// writer
 	userInfo := &logic.AuthReply{}
@@ -149,7 +149,7 @@ func startClient(key int64) {
 		hbProto := new(protocol.Proto)
 		for {
 			// heartbeat
-			hbProto.Op = OpSendMsg
+			hbProto.Op = OpSendAreaMsg
 			hbProto.Seq = seq
 			hbProto.Data, _ = proto.Marshal(&comet.Msg{
 				Type:   comet.Type_AREA,
@@ -161,23 +161,21 @@ func startClient(key int64) {
 				log.Errorf("key:%d tcpWriteProto() error(%v)", key, err)
 				return
 			}
-			log.Infof("key:%d Write heartbeat", key)
-			time.Sleep(heart)
+			//log.Infof("key:%d send msg %+v", key, hbProto)
 			seq++
 			select {
 			case <-quit:
 				return
 			default:
 			}
+			time.Sleep(time.Microsecond * time.Duration(rand.Intn(100)))
 		}
 	}()
 	// reader
 	for {
-		if err = p.DecodeFromBytes(rd); err != nil {
-			log.Errorf("key:%d tcpReadProto() error(%v)", key, err)
-			quit <- true
-			return
+		if err = p.DecodeFromBytes(rd); err == nil {
+			atomic.AddInt64(&countDown, 1)
+			//log.Infof("key:%d auth ok, p: %v", key, p)
 		}
-		atomic.AddInt64(&countDown, 1)
 	}
 }

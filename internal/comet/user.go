@@ -9,6 +9,7 @@ import (
 
 type User struct {
 	Uid      uint64
+	Area     *Area
 	Room     *Room
 	Next     *User
 	Prev     *User

@@ -6,9 +6,9 @@ comet:
     maxConnections: 1000000
     goroutines: 0
   queue:
-    topic: topic # topic name example server.name-queue.topic
+    topic: comet0 # topic name example server.name-queue.topic
     group: group  # group name example server.name-queue.group
-    brokers: ["192.168.1.123:9092"]
+    brokers: ["124.71.19.25:9094"]
   ssl:
     enabled: false
     key: /etc/letsencrypt/live/example.com/privkey.pem

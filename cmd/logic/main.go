@@ -49,13 +49,15 @@ func (s *server) OnMessage(ctx context.Context, req *pb.MessageReq) (*empty.Empt
 		return &empty.Empty{}, err
 	}
 	s.kafka.Input() <- &sarama.ProducerMessage{
-		Topic: req.GetCometKey(),
-		Value: sarama.ByteEncoder(kafkaMetaByte),
+		Topic:     req.GetCometKey(),
+		Value:     sarama.ByteEncoder(kafkaMetaByte),
+		Partition: int32(req.ToId % 10),
 	}
 	return &empty.Empty{}, nil
 }
 
 func main() {
+	successCount := 0
 	flag.Parse()
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 	if err != nil {
@@ -64,6 +66,17 @@ func main() {
 	s := grpc.NewServer()
 	kafka := NewKafkaProducer()
 	pb.RegisterLogicServer(s, &server{kafka: kafka})
+	go func() {
+		for err := range kafka.Errors() {
+			log.Println(err)
+		}
+	}()
+	go func() {
+		for _ = range kafka.Successes() {
+			successCount++
+			log.Println(successCount)
+		}
+	}()
 	log.Printf("server listening at %v", lis.Addr())
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)

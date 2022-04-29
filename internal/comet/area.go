@@ -24,14 +24,12 @@ func (a *Area) Close() {
 
 func (a *Area) JoinArea(user *User) {
 	a.lock.Lock()
+	defer a.lock.Unlock()
 	if a.head == nil {
 		a.head = user
 		a.Online++
-		a.lock.Unlock()
 		return
 	}
-	a.lock.Unlock()
-
 	user.Next = a.head
 	a.head = user
 	a.Online++
