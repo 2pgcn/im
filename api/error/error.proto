@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package error;
 
-option go_package = "github.com/php403/gameim/api/error;error";
+option go_package = "github.com/2pgcn/gameim/api/error;error";
 
 message Status {
 	int32 code = 1;

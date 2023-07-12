@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package logic;
 
-option go_package = "github.com/php403/gameim/api/logic;logic";
+option go_package = "github.com/2pgcn/gameim/api/logic;logic";
 import "google/protobuf/empty.proto";
 import "api/comet/comet.proto";
 

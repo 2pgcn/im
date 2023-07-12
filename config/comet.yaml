@@ -1,4 +1,5 @@
 comet:
+  isDev: true
   server:
     name: comet0
     addrs: [127.0.0.1:9001]
@@ -6,13 +7,19 @@ comet:
     maxConnections: 1000000
     goroutines: 0
   queue:
-    topic: comet0 # topic name example server.name-queue.topic
-    group: group  # group name example server.name-queue.group
-    brokers: ["124.71.19.25:9094"]
+    type: redis
+    redis:
+      addr: 127.0.0.1:6379
+      password: ""
+      db: 0
+    kafka:
+      topic: [ comet0 ] # topic name example server.name-queue.topic
+      group: group  # group name example server.name-queue.group
+      brokers: [ "124.71.19.25:9094" ]
   ssl:
     enabled: false
-    key: /etc/letsencrypt/live/example.com/privkey.pem
-    cert: /etc/letsencrypt/live/example.com/fullchain.pem
+    #key: /etc/letsencrypt/live/example.com/privkey.pem
+    #cert: /etc/letsencrypt/live/example.com/fullchain.pem
   tcp:
     sendBuf: 1024
     recvBuf: 1024

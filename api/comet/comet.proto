@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package comet;
 
-option go_package = "github.com/php403/gameim/api/comet;comet";
+option go_package = "github.com/2pgcn/gameim/api/comet;comet";
 
 enum Type {
   AREA = 0;

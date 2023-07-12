@@ -1,18 +1,18 @@
 package comet
 
 import (
-	"github.com/php403/gameim/api/comet"
+	"github.com/2pgcn/gameim/api/comet"
 	"sync"
 )
 
 type Area struct {
-	Id     uint64
+	Id     areaId
 	Online uint32
 	lock   sync.RWMutex
 	head   *User
 }
 
-func NewArea(id uint64) (a *Area) {
+func NewArea(id areaId) (a *Area) {
 	a = new(Area)
 	a.Id = id
 	a.Online = 0

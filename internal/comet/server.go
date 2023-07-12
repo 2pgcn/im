@@ -3,14 +3,15 @@ package comet
 import (
 	"bufio"
 	"context"
+	"github.com/2pgcn/gameim/api/comet"
+	"github.com/2pgcn/gameim/api/logic"
+	"github.com/2pgcn/gameim/api/protocol"
+	"github.com/2pgcn/gameim/config"
 	"github.com/golang/protobuf/proto"
-	"github.com/php403/gameim/api/comet"
-	"github.com/php403/gameim/api/logic"
-	"github.com/php403/gameim/api/protocol"
-	"github.com/php403/gameim/config"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 	"net"
 	"sync"
 	"time"
@@ -36,8 +37,15 @@ func NewServer(ctx context.Context, log *zap.SugaredLogger, config *config.Comet
 		Apps: map[string]*App{},
 		conf: config,
 		//todo 绑到app下
-		logic: newLogicClient(ctx, config.LogicClientGrpc),
 	}
+	if config.IsDev {
+		server.logic = newLogicClientTest()
+	} else {
+		server.logic = newLogicClient(ctx, config.LogicClientGrpc)
+	}
+
+	InitChanQueue(ctx, log, config.Queue)
+
 	//启动消费队列消费
 	for _, v := range config.Server.Addrs {
 		addr := v
@@ -115,9 +123,9 @@ func (s *Server) handleComet(ctx context.Context, conn net.Conn) {
 	}
 	//appid 先写死,后面通过proto.data里解码获取
 	//userInfo authReply
-	user.Uid = authReply.Uid
-	user.AreaId = authReply.AreaId
-	user.RoomId = authReply.RoomId
+	user.Uid = userId(authReply.Uid)
+	user.AreaId = areaId(authReply.AreaId)
+	user.RoomId = roomId(authReply.RoomId)
 	var app *App
 	var ok bool
 	s.Lock.Lock()
@@ -204,13 +212,23 @@ func (s *Server) handleComet(ctx context.Context, conn net.Conn) {
 				p.Op = protocol.OpSendMsgReply
 				sendType = comet.Type_PUSH
 			}
-			_, err = s.logic.OnMessage(ctx, &logic.MessageReq{
-				Type:     sendType,
-				SendId:   user.Uid,
-				ToId:     user.AreaId,
-				Msg:      p.Data,
-				CometKey: s.Name,
-			})
+			if s.conf.IsDev {
+				//todo 仅测试使用
+				GameQueue.Push(appid, &comet.Msg{
+					Type:   sendType,
+					SendId: uint64(user.Uid),
+					ToId:   uint64(user.AreaId),
+					Msg:    p.Data,
+				})
+			} else {
+				_, err = s.logic.OnMessage(ctx, &logic.MessageReq{
+					Type:     sendType,
+					SendId:   uint64(user.Uid),
+					ToId:     uint64(user.AreaId),
+					Msg:      p.Data,
+					CometKey: s.Name,
+				})
+			}
 			if err != nil {
 				s.log.Errorf("s.logic.OnMessage(ctx, &logic.MessageReq{Type:comet.Type_AREA,SendId:%d,ToId:%d,Msg:%s,CometKey:%s}) error(%v)", user.Uid, user.AreaId, string(p.Data), s.Name, err)
 				return
@@ -236,30 +254,24 @@ const (
 func newLogicClient(ctx context.Context, c *config.CometConfigLogicClientGrpc) logic.LogicClient {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(c.Timeout))
 	defer cancel()
-	//todo 改成服务发现,接口获取 抽象etcd等
-	//grpc.WithInitialWindowSize(grpcInitialWindowSize),
-	//			grpc.WithInitialConnWindowSize(grpcInitialConnWindowSize),
-	//			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcMaxCallMsgSize)),
-	//			grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(grpcMaxSendMsgSize)),
-	//			grpc.WithKeepaliveParams(keepalive.ClientParameters{
-	//				Time:                grpcKeepAliveTime,
-	//				Timeout:             grpcKeepAliveTimeout,
-	//				PermitWithoutStream: true,
-	//			}),
 	conn, err := grpc.Dial(c.Addr,
 		grpc.WithInitialWindowSize(grpcInitialWindowSize),
 		grpc.WithInitialConnWindowSize(grpcInitialConnWindowSize),
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcMaxCallMsgSize)),
 		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(grpcMaxSendMsgSize)),
-		//grpc.WithKeepaliveParams(keepalive.ClientParameters{
-		//	Time:                grpcKeepAliveTime,
-		//	Timeout:             grpcKeepAliveTimeout,
-		//	PermitWithoutStream: true,
-		//}),
+		grpc.WithKeepaliveParams(keepalive.ClientParameters{
+			Time:                grpcKeepAliveTime,
+			Timeout:             grpcKeepAliveTimeout,
+			PermitWithoutStream: true,
+		}),
 		grpc.WithTransportCredentials(insecure.NewCredentials()), //todo 安全验证
 	)
 	if err != nil {
 		panic(err)
 	}
 	return logic.NewLogicClient(conn)
+}
+
+func newLogicClientTest() logic.LogicClient {
+	return &logicClientTest{}
 }

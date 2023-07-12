@@ -1,14 +1,18 @@
 package comet
 
 import (
-	"github.com/php403/gameim/api/comet"
+	"github.com/2pgcn/gameim/api/comet"
 	"sync"
 )
 
+type areaId uint64
+type roomId uint64
+type userId uint64
+
 type Bucket struct {
-	areas         map[uint64]*Area
-	rooms         map[uint64]*Room
-	users         map[uint64]*User //所有用户
+	areas         map[areaId]*Area
+	rooms         map[roomId]*Room
+	users         map[userId]*User //所有用户
 	lock          sync.RWMutex
 	routines      []chan *comet.Msg
 	onlineUserNum uint64
@@ -17,9 +21,9 @@ type Bucket struct {
 
 func NewBucket() *Bucket {
 	return &Bucket{
-		areas:         make(map[uint64]*Area, 1),
-		rooms:         make(map[uint64]*Room, 16),
-		users:         make(map[uint64]*User, 1025),
+		areas:         make(map[areaId]*Area, 1),
+		rooms:         make(map[roomId]*Room, 16),
+		users:         make(map[userId]*User, 1025),
 		routines:      make([]chan *comet.Msg, 128),
 		heartbeat:     NewHeartbeat(),
 		onlineUserNum: 0,
@@ -56,7 +60,7 @@ func (b *Bucket) PutUser(user *User) {
 }
 
 // Room get a room by roomid.
-func (b *Bucket) Room(rid uint64) (room *Room) {
+func (b *Bucket) Room(rid roomId) (room *Room) {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
 	room = b.rooms[rid]
@@ -67,13 +71,13 @@ func (b *Bucket) Room(rid uint64) (room *Room) {
 	return
 }
 
-func (b *Bucket) Area(rid uint64) (area *Area) {
+func (b *Bucket) Area(aid areaId) (area *Area) {
 	b.lock.RLock()
 	defer b.lock.RUnlock()
-	area = b.areas[rid]
+	area = b.areas[aid]
 	if area == nil {
-		area = NewArea(rid)
-		b.areas[rid] = area
+		area = NewArea(aid)
+		b.areas[aid] = area
 	}
 	return
 }
@@ -86,16 +90,16 @@ func (b *Bucket) DelRoom(room *Room) {
 	room.Close()
 }
 
-func (b *Bucket) Rooms() (res map[uint64]struct{}) {
+func (b *Bucket) Rooms() (res map[roomId]struct{}) {
 	var (
-		roomID uint64
-		room   *Room
+		rid  roomId
+		room *Room
 	)
-	res = make(map[uint64]struct{})
+	res = make(map[roomId]struct{})
 	b.lock.RLock()
-	for roomID, room = range b.rooms {
+	for rid, room = range b.rooms {
 		if room.Online > 0 {
-			res[roomID] = struct{}{}
+			res[rid] = struct{}{}
 		}
 	}
 	b.lock.RUnlock()
@@ -107,16 +111,16 @@ func (b *Bucket) broadcast(c *comet.Msg) {
 	defer b.lock.RUnlock()
 	switch c.Type {
 	case comet.Type_ROOM:
-		if room := b.Room(c.ToId); room != nil {
+		if room := b.Room(roomId(c.ToId)); room != nil {
 			room.Push(c)
 		}
 	case comet.Type_AREA:
-		if area := b.Area(c.ToId); area != nil {
+		if area := b.Area(areaId(c.ToId)); area != nil {
 			area.Push(c)
 		}
 	case comet.Type_PUSH:
 		b.lock.RLock()
-		user := b.users[c.ToId]
+		user := b.users[userId(c.ToId)]
 		b.lock.RUnlock()
 		if user != nil {
 			user.Push(c)

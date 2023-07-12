@@ -1,23 +1,23 @@
 package comet
 
 import (
-	"github.com/php403/gameim/api/comet"
+	"github.com/2pgcn/gameim/api/comet"
 	"sync"
 )
 
 type Room struct {
-	Id     uint64
+	Id     roomId
 	Online uint32
 	drop   bool
 	lock   sync.RWMutex
-	users  map[uint64]*User //uid
+	users  map[userId]*User //uid
 }
 
-func NewRoom(id uint64) (r *Room) {
+func NewRoom(id roomId) (r *Room) {
 	r = new(Room)
 	r.Id = id
 	r.drop = false
-	r.users = make(map[uint64]*User, 1024) //todo 从config读取
+	r.users = make(map[userId]*User, 1024) //todo 从config读取
 	r.Online = 0
 	return
 }

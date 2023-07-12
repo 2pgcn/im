@@ -2,20 +2,20 @@ package comet
 
 import (
 	"bufio"
-	"github.com/php403/gameim/api/comet"
-	"github.com/php403/gameim/pkg/errors"
+	"github.com/2pgcn/gameim/api/comet"
+	"github.com/2pgcn/gameim/pkg/errors"
 	"sync"
 )
 
 type User struct {
-	Uid      uint64
+	Uid      userId
 	Area     *Area
 	Room     *Room
 	Next     *User
 	Prev     *User
 	AppId    uint64
-	AreaId   uint64
-	RoomId   uint64
+	AreaId   areaId
+	RoomId   roomId
 	lock     sync.RWMutex
 	msgQueue chan *comet.Msg
 	ReadBuf  *bufio.Reader

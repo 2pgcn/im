@@ -9,10 +9,10 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"github.com/2pgcn/gameim/api/comet"
+	"github.com/2pgcn/gameim/api/logic"
+	"github.com/2pgcn/gameim/api/protocol"
 	"github.com/golang/protobuf/proto"
-	"github.com/php403/gameim/api/comet"
-	"github.com/php403/gameim/api/logic"
-	"github.com/php403/gameim/api/protocol"
 	"go.uber.org/zap"
 	"math/rand"
 	"net"
@@ -133,7 +133,7 @@ func startClient(key int64) {
 	}
 	for {
 		if err = p.DecodeFromBytes(rd); err == nil && p.Op == OpAuthReply {
-			log.Infof("key:%d auth ok, p: %v", key, p)
+			log.Infof("key:%d auth ok, p: %v", string(key), p)
 			break
 		}
 	}

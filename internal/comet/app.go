@@ -3,10 +3,9 @@ package comet
 import (
 	"context"
 	"fmt"
+	"github.com/2pgcn/gameim/api/comet"
+	"github.com/2pgcn/gameim/config"
 	"github.com/Shopify/sarama"
-	"github.com/golang/protobuf/proto"
-	"github.com/php403/gameim/api/comet"
-	"github.com/php403/gameim/config"
 	"go.uber.org/zap"
 	"sync"
 )
@@ -18,7 +17,6 @@ type App struct {
 	Buckets   []*Bucket //app bucket
 	bucketIdx uint32
 	lock      sync.RWMutex
-	queues    sarama.ConsumerGroup
 	log       *zap.SugaredLogger
 }
 
@@ -39,45 +37,46 @@ func NewApp(ctx context.Context, appid string, config *config.CometConfigQueueMs
 	for i := 0; i < 1; i++ {
 		app.Buckets[i] = NewBucket()
 	}
-	consumer, err := NewConsumerGroupHandler(config)
-	if err != nil {
-		return nil, err
-	}
-	app.queues = consumer
-	handle := &consumerGroupHandler{
-		AppId:        appid,
-		ctx:          ctx,
-		consumerFunc: app.queueHandle,
-		log:          app.log,
-	}
-	go func() {
-		defer func() {
-			fmt.Println("exit consumer")
-			err := app.queues.Close()
-			if err != nil {
-				handle.log.Errorf("%v app.queues.Close error %v", app, err)
-			}
-		}()
-		for {
-			err := app.queues.Consume(app.ctx, app.config.Topic, handle)
-			if err != nil {
-				handle.log.Errorf("%v group.Consume error %v", app, err)
-			}
-		}
-	}()
-	go func() {
-		select {
-		case err := <-app.queues.Errors():
-			app.log.Errorf("app %s .Queues.Errors() %s", appid, err)
-		case <-ctx.Done():
-			return
-		}
-	}()
+	//consumer, err := NewConsumerGroupHandler(config)
+	//if err != nil {
+	//	return nil, err
+	//}
+
+	go app.queueHandle()
+	//handle := &consumerGroupHandler{
+	//	AppId:        appid,
+	//	ctx:          ctx,
+	//	consumerFunc: app.queueHandle,
+	//	log:          app.log,
+	//}
+	//go func() {
+	//	defer func() {
+	//		fmt.Println("exit consumer")
+	//		err := app.queues.Close()
+	//		if err != nil {
+	//			handle.log.Errorf("%v app.queues.Close error %v", app, err)
+	//		}
+	//	}()
+	//	for {
+	//		err := app.queues.Consume(app.ctx, app.config.Topic, handle)
+	//		if err != nil {
+	//			handle.log.Errorf("%v group.Consume error %v", app, err)
+	//		}
+	//	}
+	//}()
+	//go func() {
+	//	select {
+	//	case err := <-app.queues.Errors():
+	//		app.log.Errorf("app %s .Queues.Errors() %s", appid, err)
+	//	case <-ctx.Done():
+	//		return
+	//	}
+	//}()
 	return app, nil
 }
 
-func (a *App) GetBucket(userId uint64) *Bucket {
-	return a.Buckets[a.GetBucketIndex(userId)]
+func (a *App) GetBucket(userId userId) *Bucket {
+	return a.Buckets[a.GetBucketIndex(uint64(userId))]
 }
 
 type consumerGroupHandler struct {
@@ -105,22 +104,44 @@ func (consumer consumerGroupHandler) ConsumeClaim(sess sarama.ConsumerGroupSessi
 	return nil
 }
 
-func (a *App) queueHandle(msg *sarama.ConsumerMessage) error {
-	cometMsg := &comet.Msg{}
-	err := proto.Unmarshal(msg.Value, cometMsg)
-	if err != nil {
-		a.log.Errorf("proto.Unmarshal error:%s", err.Error())
-		return err
+func (a *App) queueHandle() (err error) {
+	//cometMsg := &comet.Msg{}
+	//err := proto.Unmarshal(msg.Value, cometMsg)
+	//if err != nil {
+	//	a.log.Errorf("proto.Unmarshal error:%s", err.Error())
+	//	return err
+	//}
+	//a.log.Debugf("%+v", cometMsg)
+	for {
+		select {
+		case <-a.ctx.Done():
+			//todo,得判断队列是否还有消息,有消息消费完
+			qLen := GameQueue.Len(a.Appid)
+			for i := 0; i >= qLen; i++ {
+				a.log.Errorf("close app error,queue len:%d", qLen)
+				a.PopQueueHandle()
+			}
+			return nil
+		default:
+			a.PopQueueHandle()
+		}
+		a.log.Debugf("queue qLen is %d", GameQueue.Len(a.Appid))
 	}
-	a.log.Debugf("%+v", cometMsg)
+
+	return nil
+}
+func (a *App) PopQueueHandle() {
+	cometMsg, err := GameQueue.Pop(a.Appid)
+	if err != nil {
+		a.log.Errorf("pop message error msg:%v,err:%v", cometMsg, err)
+	}
 	switch cometMsg.Type {
 	case comet.Type_PUSH:
-		bucket := a.GetBucket(cometMsg.ToId)
-		if user, ok := bucket.users[cometMsg.ToId]; ok {
+		bucket := a.GetBucket(userId(cometMsg.ToId))
+		if user, ok := bucket.users[userId(cometMsg.ToId)]; ok {
 			err = user.Push(cometMsg)
 			if err != nil {
 				a.log.Errorf("user.Push error:%s", err.Error())
-				return err
 			}
 		} else {
 			a.log.Errorf("user not exist:%d", cometMsg.ToId)
@@ -135,10 +156,9 @@ func (a *App) queueHandle(msg *sarama.ConsumerMessage) error {
 	default:
 		a.log.Errorf("unknown msg type:%d", cometMsg.Type)
 	}
-	return nil
 }
 
-//广播工会消息
+// 广播工会消息
 func (a *App) broadcast(c *comet.Msg) {
 	a.log.Debugf("broadcast:%+v", c)
 	//bucket 不涉及动态扩容 不需加锁

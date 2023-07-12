@@ -11,7 +11,7 @@ func InitCometConfig(CfgFile string) (cometConfig *CometConfig) {
 		panic(fmt.Errorf("config file %s not found", CfgFile))
 	}
 
-	viper.AddConfigPath("/Users/pg/work/go/gopath/src/github.com/gameim/config")
+	viper.AddConfigPath("/Users/pg/work/go/gopath/src/github.com/2pgcn/gameim/config")
 	viper.SetConfigName("comet")
 	viper.SetConfigType("yaml")
 	if err := viper.ReadInConfig(); err != nil {

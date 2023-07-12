@@ -2,8 +2,17 @@ syntax = "proto3";
 
 package config;
 
-option go_package = "github.com/php403/gameim/config;config";
+option go_package = "github.com/2pgcn/gameim/config;config";
 
+enum QueueType{
+  REDIS = 0;
+  KAFKA = 1;
+}
+
+//repeated string topic = 1;
+//     string group = 2;
+//     repeated string brokers = 3;
+//     int32 partition = 4;
 message CometConfig{
   message serverMsg{
     string name = 1;
@@ -14,10 +23,14 @@ message CometConfig{
   }
   //todo 目前仅为kafka
   message queueMsg{
-     string topic = 1;
-     string group = 2;
-     repeated string brokers = 3;
-     int32 partition = 4;
+    string type = 1;
+    Redis redis = 2;
+    message Redis{
+        string addr = 1;
+        string password = 2;
+        int32 db = 3;
+    }
+
   }
   message sslMsg{
     bool enable = 1;
@@ -38,7 +51,7 @@ message CometConfig{
   sslMsg ssl = 3;
   tcpMsg tcp = 4;
   logicClientGrpc logic_client_grpc = 5;
-
+  bool  is_dev = 6;
 }
 
 message LogicConfig{
