@@ -13,8 +13,9 @@ WORKDIR /app
 COPY --from=builder /src/comet /app
 COPY --from=builder /src/logic /app
 
-COPY --from=builder /src/conf/logic.yaml /app/conf/logic.yaml
-COPY --from=builder /src/conf/comet.yaml /app/conf/comet.yaml
+#通过configmap构建进去
+#COPY --from=builder /src/conf/logic.yaml /app/conf/logic.yaml
+#COPY --from=builder /src/conf/comet.yaml /app/conf/comet.yaml
 
 
 EXPOSE 8000
