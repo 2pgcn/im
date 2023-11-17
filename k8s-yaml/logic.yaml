@@ -43,7 +43,7 @@ spec:
       containers:
         - image: ${IMAGE}
           name: logic-app001
-          command: [ "/app/bin/logic" ]
+          command: [ "/app/logic" ]
           args: ["-conf","/app/conf/logic.yaml"]
           resources:
             requests:
