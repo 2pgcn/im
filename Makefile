@@ -59,6 +59,14 @@ delete:
 	kubectl delete -f ./k8s-yaml/logic.yaml
 	kubectl delete -f ./k8s-yaml/comet.yaml
 
+.PHONY: buildlogic
+buildlogic:
+	mkdir -p bin/ && go build -gcflags="all=-N -l" -ldflags "-X main.Version=$(GAMEIMVERSION)" -o ./bin/server ./cmd/logic/...
+.PHONY: buildcomet
+buildcomet:
+	mkdir -p bin/ && go build -gcflags="all=-N -l" -ldflags "-X main.Version=$(GAMEIMVERSION)" -o ./bin/server ./cmd/comet/...
+
 .PHONY: build
 build:
-	make buildimage
+	make buildlogic
+	make buildcomet
