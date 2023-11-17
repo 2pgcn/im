@@ -1,0 +1,41 @@
+comet:
+  isDev: true
+  server:
+    name: comet0
+    addrs: [127.0.0.1:10001]
+    port: 9000
+    maxConnections: 1000000
+    goroutines: 0
+  queue:
+    type: redis
+    redis:
+      addr: 127.0.0.1:6379
+      password: ""
+      db: 0
+    kafka:
+      topic: "gameim-comet-0" # topic name example server.name-queue.topic
+      bootstrapServers: ["ckafka-bzmjpd9e.ap-guangzhou.ckafka.tencentcloudmq.com:50000"]
+      consumerGroupId: gameim-comet-0  # group name example server.name-queue.group
+      partition_num: 3
+      sasl:
+        username: "ckafka-bzmjpd9e#pg"
+        password: "pg719&1996"
+        instanceId: "ckafka-bzmjpd9e"
+  ssl:
+    enabled: false
+    #key: /etc/letsencrypt/live/example.com/privkey.pem
+    #cert: /etc/letsencrypt/live/example.com/fullchain.pem
+  tcp:
+    sendBuf: 1024
+    recvBuf: 1024
+    keepalive: false
+  appConfig: [{appid: "app001",pwd: "app001",bucketNum: 128}]
+  logicClientGrpc:
+    addr: "node1.2pg.cn:31363"
+    timeout: 5
+  traceConf:
+     slsProjectHeader: "gameim"
+     slsInstanceIDHeader: "gameim"
+     slsAccessKeyIDHeader: "LTAI5t9xdeJpqKqTapDfUctd"
+     slsAccessKeySecretHeader: "qH5IWvC7JQzPG5lIdfhq8WzRcGUHEY"
+     endpoint: "gameim.cn-shenzhen.log.aliyuncs.com:10010"

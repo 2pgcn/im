@@ -4,7 +4,7 @@ package logic;
 
 option go_package = "github.com/2pgcn/gameim/api/logic;logic";
 import "google/protobuf/empty.proto";
-import "api/comet/comet.proto";
+import "comet/comet.proto";
 
 service Logic {
   rpc OnAuth(AuthReq) returns (AuthReply) {}
@@ -18,22 +18,20 @@ message AuthReq {
 }
 
 message AuthReply {
-  uint64 uid = 1;
-  uint64 area_id =2;
-  uint64 room_id = 3;
+  string appid = 1;
+  uint64 uid = 2;
+  string room_id = 4;
 }
 
 message ConnectReq{
   uint64 uid = 1;
 }
-message ConnectReply{
-  uint64 uid = 1;
-}
+
 
 message MessageReq{
   comet.Type type = 1;
   string comet_key = 2;
-  uint64 to_id = 3;
+  string to_id = 3;
   uint64 send_id = 4;
   bytes msg = 5;
 }

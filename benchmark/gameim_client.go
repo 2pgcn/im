@@ -122,18 +122,20 @@ func startClient(key int64) {
 	wr := bufio.NewWriter(conn)
 	rd := bufio.NewReader(conn)
 
+	authToken := atomic.LoadInt64(&aliveCount)
 	p := new(protocol.Proto)
 	p.Version = 1
 	p.Op = OpAuth
 	p.Seq = seq
-	p.Data = []byte("testToken")
+	p.Data = []byte(strconv.Itoa(int(authToken)))
+	fmt.Println(strconv.Itoa(int(authToken)))
 	if err = p.WriteTcp(wr); err != nil {
 		log.Errorf("tcpWriteProto() error(%v)", err)
 		return
 	}
 	for {
 		if err = p.DecodeFromBytes(rd); err == nil && p.Op == OpAuthReply {
-			log.Infof("key:%d auth ok, p: %v", string(key), p)
+			log.Infof("key:%d auth ok, p: %v", strconv.FormatInt(key, 10), p)
 			break
 		}
 	}
@@ -145,37 +147,37 @@ func startClient(key int64) {
 		log.Errorf("auth proto.Unmarshal() error(%v)", err)
 	}
 	//测试 1000000用户在一个区
-	go func() {
-		hbProto := new(protocol.Proto)
-		for {
-			// heartbeat
-			hbProto.Op = OpSendAreaMsg
-			hbProto.Seq = seq
-			hbProto.Data, _ = proto.Marshal(&comet.Msg{
-				Type:   comet.Type_AREA,
-				ToId:   userInfo.AreaId,
-				SendId: userInfo.Uid,
-				Msg:    []byte("hello world"),
-			})
-			if err = hbProto.WriteTcp(wr); err != nil {
-				log.Errorf("key:%d tcpWriteProto() error(%v)", key, err)
-				return
-			}
-			//log.Infof("key:%d send msg %+v", key, hbProto)
-			seq++
-			select {
-			case <-quit:
-				return
-			default:
-			}
-			time.Sleep(time.Microsecond * time.Duration(rand.Intn(100)))
-		}
-	}()
+	//go func() {
+	hbProto := new(protocol.Proto)
+	//for {
+	// heartbeat
+	hbProto.Op = OpSendAreaMsg
+	hbProto.Seq = seq
+	hbProto.Data, _ = proto.Marshal(&comet.MsgData{
+		Type:   comet.Type_ROOM,
+		ToId:   userInfo.RoomId,
+		SendId: userInfo.Uid,
+		Msg:    []byte("hello world gameim"),
+	})
+	if err = hbProto.WriteTcp(wr); err != nil {
+		log.Errorf("key:%d tcpWriteProto() error(%v)", key, err)
+		return
+	}
+	//log.Infof("key:%d send msg %+v", key, hbProto)
+	seq++
+	//select {
+	//case <-quit:
+	//	return
+	//default:
+	//}
+	//time.Sleep(time.Microsecond * time.Duration(rand.Intn(100)))
+	//}
+	//}()
 	// reader
 	for {
 		if err = p.DecodeFromBytes(rd); err == nil {
 			atomic.AddInt64(&countDown, 1)
-			//log.Infof("key:%d auth ok, p: %v", key, p)
+			log.Infof("key:%v. p: %s", key, string(p.Data))
 		}
 	}
 }

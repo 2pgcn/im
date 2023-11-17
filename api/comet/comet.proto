@@ -4,16 +4,20 @@ package comet;
 
 option go_package = "github.com/2pgcn/gameim/api/comet;comet";
 
+
 enum Type {
-  AREA = 0;
+  APP = 0;
   ROOM = 1;
   PUSH = 2;
   CLOSE = 3;
 }
-//todo 可单独拆分job层 目前为每个comet绑定对应的kafka topic
-message Msg{
+
+
+
+
+message MsgData{
   Type type = 1;
-  uint64 to_id = 2;
+  string to_id = 2;
   uint64 send_id = 3;
   bytes msg = 4;
 }

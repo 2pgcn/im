@@ -1,0 +1,79 @@
+syntax = "proto3";
+
+package conf;
+
+option go_package = "github.com/2pgcn/gameim/conf;conf";
+
+enum QueueType{
+  KAFKA = 0;
+}
+message serverMsg{
+  string name = 1;
+  repeated string addrs = 2;
+  int32 port = 3;
+  uint32 max_connections = 4; //max conn nums
+  uint32 goroutines = 5; //go routines nums default is 0 means use cpu nums
+}
+
+message queueMsg{
+  string type = 1;
+  Redis redis = 2;
+  Kafka kafka = 3;
+  message Redis{
+    string addr = 1;
+    string password = 2;
+    int32 db = 3;
+  }
+  message sasl{
+    string username = 1;
+    string password = 2;
+    string instance_id = 3;
+  }
+  message Kafka{
+    string topic = 1;
+    sasl sasl = 2;
+    repeated string bootstrap_servers = 3;
+    string  consumer_group_id = 4;
+    int32 partition_num = 5;
+  }
+}
+
+message sslMsg{
+  bool enable = 1;
+  string key = 2;
+  string cert = 3;
+}
+message tcpMsg{
+  uint64 send_buf =1;
+  uint64 recv_buf = 2;
+  bool keepalive = 3;
+}
+message logicClientGrpc{
+  string addr = 1;
+  uint32 timeout = 2;
+}
+message app_config{
+  string appid = 1;
+  //todo 暂未启用认证
+  string pwd = 2;
+  //bucket 根据bucketNum哈希 减少app里存储的全区的锁力度
+  int32 bucketNum = 3;
+}
+message CometConfig{
+  serverMsg server = 1;
+  queueMsg queue = 2;
+  sslMsg ssl = 3;
+  tcpMsg tcp = 4;
+  logicClientGrpc logic_client_grpc = 5;
+  repeated app_config app_config = 6;
+  TraceConf TraceConf = 7;
+}
+
+
+message TraceConf{
+  string slsProjectHeader = 1;
+  string slsInstanceIDHeader =2;
+  string slsAccessKeyIDHeader = 3;
+  string slsAccessKeySecretHeader = 4;
+  string endpoint = 5;
+}

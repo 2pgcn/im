@@ -5,10 +5,13 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	error2 "github.com/2pgcn/gameim/api/error"
+	"github.com/cenkalti/backoff/v4"
+	"github.com/golang/protobuf/proto"
 	"math"
 )
 
-//todo 改成自定义包
+// todo 改成自定义包
 var (
 	ErrInvalidBuffer = errors.New("invalid protocol")
 )
@@ -61,7 +64,7 @@ type Proto struct {
 }
 
 // SerializeTo todo checksum
-//传进来避免内存逃逸
+// 传进来避免内存逃逸
 func (p *Proto) SerializeTo(bytes []byte) (err error) {
 	if len(bytes) < HeaderLen {
 		return ErrInvalidBuffer
@@ -76,7 +79,16 @@ func (p *Proto) SerializeTo(bytes []byte) (err error) {
 	return
 }
 
+// WriteTcp default Retry 3
 func (p *Proto) WriteTcp(writer *bufio.Writer) (err error) {
+	operation := func() error {
+		return p.writeTcp(writer)
+	}
+	err = backoff.Retry(operation, backoff.NewExponentialBackOff())
+	return err
+}
+
+func (p *Proto) writeTcp(writer *bufio.Writer) (err error) {
 	b := make([]byte, HeaderLen+len(p.Data))
 	if len(b) < HeaderLen {
 		return ErrInvalidBuffer
@@ -91,7 +103,6 @@ func (p *Proto) WriteTcp(writer *bufio.Writer) (err error) {
 	if err = binary.Write(writer, binary.BigEndian, b); err != nil {
 		return
 	}
-
 	return writer.Flush()
 }
 
@@ -136,6 +147,18 @@ func Checksum(data []byte, csum uint32) uint16 {
 	return ^uint16(csum)
 }
 
-func ReadTcp() {
+func (p *Proto) SendError(err *error2.Error, op uint16) {
+	p.Op = op
+	p.Data = err.Marshal()
+}
 
+func NewProtoMsg(op uint16, msg proto.Message) (*Proto, error) {
+	data, err := proto.Marshal(msg)
+	return &Proto{
+		Version:  1,
+		Op:       op,
+		Checksum: 0,
+		Seq:      0,
+		Data:     data,
+	}, err
 }

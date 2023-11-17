@@ -1,84 +1,118 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
-	"github.com/2pgcn/gameim/api/comet"
-	pb "github.com/2pgcn/gameim/api/logic"
-	"github.com/Shopify/sarama"
-	"github.com/golang/protobuf/proto"
-	"github.com/golang/protobuf/ptypes/empty"
-	"google.golang.org/grpc"
-	"log"
-	"net"
-	"sync/atomic"
+	"github.com/2pgcn/gameim/internal/logic/server"
+	"github.com/2pgcn/gameim/pkg/gamelog"
+	"github.com/2pgcn/gameim/pkg/trace_conf"
+	"github.com/go-kratos/kratos/v2"
+	"net/http"
+	"os"
+
+	"github.com/2pgcn/gameim/conf"
+
+	"github.com/go-kratos/kratos/v2/config"
+	"github.com/go-kratos/kratos/v2/config/file"
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/go-kratos/kratos/v2/middleware/tracing"
+	"github.com/go-kratos/kratos/v2/transport/grpc"
+	_ "go.uber.org/automaxprocs"
+	_ "net/http/pprof"
 )
 
-// server is used to implement helloworld.GreeterServer.
-type server struct {
-	pb.UnimplementedLogicServer
-	kafka sarama.AsyncProducer
-}
-
+// go build -ldflags "-X main.Version=x.y.z"
 var (
-	port   = flag.Int("port", 9000, "The server port")
-	online = uint64(1)
+	Name           string
+	Version        string
+	flagconf       string
+	KubeConfigPath string
+
+	id, _ = os.Hostname()
 )
 
-// OnAuth 100万连接 1个区分10个工会
-func (s *server) OnAuth(ctx context.Context, in *pb.AuthReq) (*pb.AuthReply, error) {
-	//token
-	uid := atomic.AddUint64(&online, 1)
-	return &pb.AuthReply{
-		Uid:    uid,
-		AreaId: uint64(1),
-		RoomId: uid % 10000,
-	}, nil
+func init() {
+	var err error
+	if err != nil {
+		panic(err)
+	}
+	flag.StringVar(&flagconf, "conf", "../../configs", "config path, eg: -conf config.yaml")
+	flag.StringVar(&Name, "name", "logic/app001", "config path, eg: -name test")
 }
 
-func (s *server) OnMessage(ctx context.Context, req *pb.MessageReq) (*empty.Empty, error) {
-	//落盘或者鉴黄,或者校验是否数据不一致
-	kafkaMeta := &comet.Msg{
-		Type: req.Type,
-		ToId: req.ToId,
-		Msg:  req.Msg,
-	}
-	kafkaMetaByte, err := proto.Marshal(kafkaMeta)
-	if err != nil {
-		return &empty.Empty{}, err
-	}
-	s.kafka.Input() <- &sarama.ProducerMessage{
-		Topic:     req.GetCometKey(),
-		Value:     sarama.ByteEncoder(kafkaMetaByte),
-		Partition: int32(req.ToId % 10),
-	}
-	return &empty.Empty{}, nil
+func initLog() log.Logger {
+	l := gamelog.GetZapLog()
+	return gamelog.NewHelper(l)
+	//
+	//writeSyncer := zapcore.AddSync(os.Stdout)
+	//encoder := zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig())
+	//core := zapcore.NewCore(encoder, writeSyncer, zapcore.DebugLevel)
+	//z := zap.New(core)
+	//logger := kratoszap.NewLogger(z)
+	//log.SetLogger(log.NewStdLogger(os.Stdout))
+	//return logger
+}
+
+func newApp(logger log.Logger, gs *grpc.Server, rs *server.OtherServer) *kratos.App {
+	return kratos.New(
+		kratos.ID(id),
+		kratos.Name(Name),
+		kratos.Version(Version),
+		kratos.Metadata(map[string]string{}),
+		kratos.Logger(logger),
+		kratos.Server(
+			gs,
+			rs,
+		),
+		//kratos.Registrar(reg),
+	)
 }
 
 func main() {
-	successCount := 0
 	flag.Parse()
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
+	lg := initLog()
+	log.SetLogger(lg)
+	logger := log.With(lg,
+		//"ts", log.DefaultTimestamp,
+		"caller", log.DefaultCaller,
+		//"service.id", id,
+		"service.name", Name,
+		//"service.version", Version,
+		"trace.id", tracing.TraceID(),
+		"span.id", tracing.SpanID(),
+	)
+	c := config.New(
+		config.WithSource(
+			file.NewSource(flagconf),
+		),
+	)
+	defer c.Close()
+	if err := c.Load(); err != nil {
+		panic(err)
+	}
+
+	var bc conf.Bootstrap
+	if err := c.Scan(&bc); err != nil {
+		panic(err)
+	}
+
+	if port := os.Getenv("ILOGTAIL_PROFILE_PORT"); len(port) > 0 {
+		startPprof(fmt.Sprintf(":", port))
+	}
+	trace_conf.SetTraceConfig(bc.Server.TraceConf)
+	app, cleanup, err := wireApp(bc.Server, bc.Data, logger)
 	if err != nil {
-		log.Fatalf("failed to listen: %v", err)
+		panic(err)
 	}
-	s := grpc.NewServer()
-	kafka := NewKafkaProducer()
-	pb.RegisterLogicServer(s, &server{kafka: kafka})
-	go func() {
-		for err := range kafka.Errors() {
-			log.Println(err)
-		}
-	}()
-	go func() {
-		for _ = range kafka.Successes() {
-			successCount++
-			log.Println(successCount)
-		}
-	}()
-	log.Printf("server listening at %v", lis.Addr())
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("failed to serve: %v", err)
+	defer cleanup()
+	// start and wait for stop signal
+	if err := app.Run(); err != nil {
+		panic(err)
 	}
+}
+
+func startPprof(port string) {
+	go func() {
+		_ = http.ListenAndServe(port, nil)
+	}()
 }

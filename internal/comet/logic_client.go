@@ -5,6 +5,7 @@ import (
 	"github.com/2pgcn/gameim/api/logic"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
+	"strconv"
 	"sync/atomic"
 )
 
@@ -18,9 +19,9 @@ func (c *logicClientTest) OnAuth(ctx context.Context, in *logic.AuthReq, opts ..
 	atomic.AddUint64(&online, 1)
 	uid := atomic.LoadUint64(&online)
 	return &logic.AuthReply{
-		Uid:    uid,
-		AreaId: uint64(1),
-		RoomId: uid % 10000,
+		Uid: uid,
+		//AreaId: uint64(1),
+		RoomId: strconv.FormatUint(uid%10000, 10),
 	}, nil
 }
 

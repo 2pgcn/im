@@ -11,4 +11,12 @@ message Status {
 	map<string, string> metadata = 4;
 };
 
+enum TypeStatusCode {
+	DEFAULT_SUCCESS = 0;
+	AUTH_ERROR = 1;
+	AUTH_APPID_ERROR =2;
+}
+
+
+
 
