@@ -32,7 +32,7 @@ func (l *KafkaLog) Printf(msg string, args ...interface{}) {
 		return
 	}
 	//debug日志太多,过滤10%
-	if rand.Intn(10)%10 == 0 {
+	if rand.Intn(100)%20 == 0 {
 		l.l.Debug(msg, args)
 	}
 }

@@ -61,7 +61,7 @@ func (a *App) queueHandle() (err error) {
 			return a.receiver.Close()
 		default:
 			msg, err := a.receiver.Receive(a.ctx)
-			a.GetLog().Debug(msg)
+			a.log.Debug(msg)
 			if err != nil {
 				a.GetLog().Errorf("message error:%s", err)
 				continue
@@ -104,7 +104,6 @@ func (a *App) queueHandle() (err error) {
 
 // 广播工会消息
 func (a *App) broadcast(c event.Event) {
-	a.GetLog().Debugf("broadcast:%+v", c)
 	//bucket 不涉及动态扩容 不需加锁
 	for _, v := range a.Buckets {
 		v.broadcast(c)

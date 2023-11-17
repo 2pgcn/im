@@ -44,7 +44,8 @@ func getExporterSls() (*otlptrace.Exporter, error) {
 		credentials.NewClientTLSFromCert(nil, ""))
 
 	traceExporter, err := otlptrace.New(context.Background(),
-		otlpTraceGrpc.NewClient(otlpTraceGrpc.WithEndpoint(traceConfig.Endpoint),
+		otlpTraceGrpc.NewClient(
+			otlpTraceGrpc.WithEndpoint(traceConfig.Endpoint),
 			traceSecureOption,
 			otlpTraceGrpc.WithHeaders(headers),
 			otlpTraceGrpc.WithCompressor(gzip.Name)))

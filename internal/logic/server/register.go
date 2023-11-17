@@ -37,9 +37,12 @@ type OtherServer struct {
 
 func (r *OtherServer) Start(ctx context.Context) error {
 	tp, err := trace_conf.GetTracerProvider()
+	if err != nil {
+		return err
+	}
 	otel.SetTracerProvider(tp)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}))
-	return err
+	return nil
 }
 
 func (r *OtherServer) Stop(ctx context.Context) error {
