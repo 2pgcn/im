@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"github.com/2pgcn/gameim/internal/logic/server"
 	"github.com/2pgcn/gameim/pkg/gamelog"
+	"github.com/2pgcn/gameim/pkg/pprof"
 	"github.com/2pgcn/gameim/pkg/trace_conf"
 	"github.com/go-kratos/kratos/v2"
+	"github.com/grafana/pyroscope-go"
 	"net/http"
 	"os"
 
@@ -37,7 +39,7 @@ func init() {
 		panic(err)
 	}
 	flag.StringVar(&flagconf, "conf", "../../configs", "config path, eg: -conf config.yaml")
-	flag.StringVar(&Name, "name", "logic/app001", "config path, eg: -name test")
+	flag.StringVar(&Name, "name", "logic-app001", "config path, eg: -name test")
 }
 
 func initLog() log.Logger {
@@ -99,6 +101,11 @@ func main() {
 	if port := os.Getenv("ILOGTAIL_PROFILE_PORT"); len(port) > 0 {
 		startPprof(fmt.Sprintf(":", port))
 	}
+	//todo 加配置里
+	err := startPyroscope(Name, Version, "http://node1.2pg.cn:4040", gamelog.GetGlobalog())
+	if err != nil {
+		panic(err)
+	}
 	trace_conf.SetTraceConfig(bc.Server.TraceConf)
 	app, cleanup, err := wireApp(bc.Server, bc.Data, logger)
 	if err != nil {
@@ -115,4 +122,8 @@ func startPprof(port string) {
 	go func() {
 		_ = http.ListenAndServe(port, nil)
 	}()
+}
+
+func startPyroscope(appname, version, endpoint string, logger pyroscope.Logger) error {
+	return pprof.InitPyroscope(appname, version, endpoint, logger)
 }

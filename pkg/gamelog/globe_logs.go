@@ -16,6 +16,10 @@ func InitGlobeLog(l *LogHelper) {
 	})
 }
 
+func GetGlobalog() *LogHelper {
+	return defaultHelperLogger
+}
+
 // Log Print log by level and keyvals.
 func Log(level log.Level, keyvals ...interface{}) error {
 	_ = defaultHelperLogger.Log(level, keyvals...)
