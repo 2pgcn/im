@@ -13,8 +13,8 @@ server:
     services_name: "/gameim/logic/app001"
 data:
   mysql:
-    dsn_master: gameim:pg719&1996@tcp(gameim.mysql.polardb.rds.aliyuncs.com:3306)/gameim
-    dsn_slave: ["gameim:pg719&1996@tcp(gameim.mysql.polardb.rds.aliyuncs.com:3306)/gameim"]
+    dsn_master: ""
+    dsn_slave: [""]
     max_idle_connection: 30
     max_open_connection: 30
     connection_max_lifetime: 300s
@@ -31,7 +31,7 @@ data:
     consumerGroupId: gameim-comet-0  # group name example server.name-queue.group
     partition_num: 3
     sasl:
-      username: "ckafka-bzmjpd9e#pg"
-      password: "pg719&1996"
-      instanceId: "ckafka-bzmjpd9e"
+      username: ""
+      password: ""
+      instanceId: ""
 

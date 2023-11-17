@@ -18,9 +18,9 @@ comet:
       consumerGroupId: gameim-comet-0  # group name example server.name-queue.group
       partition_num: 3
       sasl:
-        username: "ckafka-bzmjpd9e#pg"
-        password: "pg719&1996"
-        instanceId: "ckafka-bzmjpd9e"
+        username: ""
+        password: ""
+        instanceId: ""
   ssl:
     enabled: false
     #key: /etc/letsencrypt/live/example.com/privkey.pem
