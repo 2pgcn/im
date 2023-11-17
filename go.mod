@@ -1,6 +1,6 @@
 module github.com/2pgcn/gameim
 
-go 1.21
+go 1.19
 
 require (
 	github.com/cenkalti/backoff/v4 v4.2.1

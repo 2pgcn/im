@@ -27,9 +27,9 @@ func (r *Room) Close() {
 	defer r.lock.Unlock()
 	for _, v := range r.users {
 		v.Close()
+		delete(r.users, v.Uid)
 	}
 	//清空user
-	clear(r.users)
 	r.drop = true
 }
 
