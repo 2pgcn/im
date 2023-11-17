@@ -41,8 +41,8 @@ comet:
 .PHONY: logic
 logic:
 	go run ./cmd/logic/... -conf=$(BASEPATH)/conf/logic.yaml
-.PHONY: push
-push:
+.PHONY: buildimage
+buildimage:
 	docker buildx build --platform linux/amd64 -f ./Dockerfile --push  -t registry.cn-shenzhen.aliyuncs.com/pg/gameim:$(GAMEIMVERSION) ./
 	#&& docker push  registry.cn-shenzhen.aliyuncs.com/pg/tcp_debug:$(TCP_DEBUG_VERSION)
 
@@ -58,3 +58,7 @@ klogic:
 delete:
 	kubectl delete -f ./k8s-yaml/logic.yaml
 	kubectl delete -f ./k8s-yaml/comet.yaml
+
+.PHONY: build
+build:
+	make buildimage
