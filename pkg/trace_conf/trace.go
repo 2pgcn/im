@@ -11,7 +11,6 @@ import (
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
-	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/encoding/gzip"
 	"sync"
 )
@@ -40,13 +39,13 @@ func getExporterSls() (*otlptrace.Exporter, error) {
 		slsAccessKeyIDHeader:     traceConfig.SlsAccessKeyIDHeader,
 		slsAccessKeySecretHeader: traceConfig.SlsAccessKeySecretHeader,
 	}
-	traceSecureOption := otlpTraceGrpc.WithTLSCredentials(
-		credentials.NewClientTLSFromCert(nil, ""))
+	//traceSecureOption := otlpTraceGrpc.WithTLSCredentials(
+	//	credentials.NewClientTLSFromCert(nil, ""))
 
 	traceExporter, err := otlptrace.New(context.Background(),
 		otlpTraceGrpc.NewClient(
 			otlpTraceGrpc.WithEndpoint(traceConfig.Endpoint),
-			traceSecureOption,
+			//traceSecureOption,
 			otlpTraceGrpc.WithHeaders(headers),
 			otlpTraceGrpc.WithCompressor(gzip.Name)))
 	return traceExporter, err

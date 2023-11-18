@@ -1,4 +1,4 @@
-FROM golang:1.21.4 AS builder
+FROM golang:1.20.1 AS builder
 
 COPY . /src
 WORKDIR /src
@@ -17,5 +17,6 @@ COPY --from=builder /src/logic /app
 #COPY --from=builder /src/conf/logic.yaml /app/conf/logic.yaml
 #COPY --from=builder /src/conf/comet.yaml /app/conf/comet.yaml
 
+EXPOSE 9001
 
-#CMD ["/app/logic","-conf=","/app/conf/logic.yaml"]
+#CMD ["/app/logic","-conf=/app/conf/logic.yaml"]

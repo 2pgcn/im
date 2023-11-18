@@ -172,20 +172,25 @@ func (s *Server) handleComet(ctx context.Context, conn *net.TCPConn) {
 	//发送消息
 	go func() {
 		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msgEvent := <-user.msgQueue:
-				msg := msgEvent.(*event.Msg)
-				writeProto, err = protocol.NewProtoMsg(msg.GetData().GetType().ToOp(), msg.GetData())
-				if err != nil {
-					s.log.Errorf("writeProto err: %+v", writeProto)
-					continue
-				}
-				if err = writeProto.WriteTcp(user.WriteBuf); err != nil {
-					s.log.Errorf("writeProto.EncodeTo(user.WriteBuf) error(%v)", err)
-					continue
-				}
+			msgEvent, err := user.Pop()
+			if err != nil {
+				s.log.Errorf("user pop msg error:%s", err.Error())
+				continue
+			}
+
+			msg, ok := msgEvent.(*event.Msg)
+			if !ok {
+				s.log.Errorf("recv msg error,want event.Msg have:%+v", msgEvent)
+				continue
+			}
+			writeProto, err = protocol.NewProtoMsg(msg.GetData().GetType().ToOp(), msg.GetData())
+			if err != nil {
+				s.log.Errorf("writeProto err: %+v", writeProto)
+				continue
+			}
+			if err = writeProto.WriteTcp(user.WriteBuf); err != nil {
+				s.log.Errorf("writeProto.EncodeTo(user.WriteBuf) error(%v)", err)
+				continue
 			}
 		}
 	}()
