@@ -9,6 +9,8 @@ import (
 	"github.com/2pgcn/gameim/pkg/trace_conf"
 	"github.com/go-kratos/kratos/v2"
 	"github.com/grafana/pyroscope-go"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 	"net/http"
 	"os"
 
@@ -74,6 +76,7 @@ func main() {
 	flag.Parse()
 	lg := initLog()
 	log.SetLogger(lg)
+
 	logger := log.With(lg,
 		//"ts", log.DefaultTimestamp,
 		"caller", log.DefaultCaller,
@@ -98,11 +101,15 @@ func main() {
 		panic(err)
 	}
 
+	err := InitOther(bc.Server.TraceConf)
+	if err != nil {
+		panic(err)
+	}
 	if port := os.Getenv("ILOGTAIL_PROFILE_PORT"); len(port) > 0 {
 		startPprof(fmt.Sprintf(":", port))
 	}
 	//todo 加配置里
-	err := startPyroscope(Name, Version, "http://node1.2pg.cn:4040", gamelog.GetGlobalog())
+	err = startPyroscope(Name, Version, "http://node1.2pg.cn:4040", gamelog.GetGlobalog())
 	if err != nil {
 		panic(err)
 	}
@@ -126,4 +133,16 @@ func startPprof(port string) {
 
 func startPyroscope(appname, version, endpoint string, logger pyroscope.Logger) error {
 	return pprof.InitPyroscope(appname, version, endpoint, logger)
+}
+
+func InitOther(traceConf *conf.TraceConf) error {
+	trace_conf.SetTraceConfig(traceConf)
+	tp, err := trace_conf.GetTracerProvider()
+	if err != nil {
+		return err
+	}
+	gamelog.Debug("trace_conf start TracerProvider and set global")
+	otel.SetTracerProvider(tp)
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}))
+	return nil
 }
