@@ -2,6 +2,7 @@ package trace_conf
 
 import (
 	"context"
+	"crypto/tls"
 	"github.com/2pgcn/gameim/conf"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -11,6 +12,7 @@ import (
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/encoding/gzip"
 	"sync"
 )
@@ -47,7 +49,9 @@ func getExporterSls() (*otlptrace.Exporter, error) {
 			otlpTraceGrpc.WithEndpoint(traceConfig.Endpoint),
 			//traceSecureOption,
 			otlpTraceGrpc.WithHeaders(headers),
-			otlpTraceGrpc.WithCompressor(gzip.Name)))
+			otlpTraceGrpc.WithCompressor(gzip.Name),
+			otlpTraceGrpc.WithTLSCredentials(credentials.NewTLS(&tls.Config{InsecureSkipVerify: true})),
+		))
 	return traceExporter, err
 }
 func GetTracerProvider() (*tracesdk.TracerProvider, error) {
