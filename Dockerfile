@@ -10,6 +10,9 @@ FROM debian:stable-slim
 
 WORKDIR /app
 
+RUN apt-get -qq update \
+ && apt-get -qq install -y --no-install-recommends ca-certificates curl
+
 COPY --from=builder /src/comet /app
 COPY --from=builder /src/logic /app
 
