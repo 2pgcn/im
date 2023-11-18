@@ -63,8 +63,8 @@ func newApp(logger log.Logger, gs *grpc.Server, rs *server.OtherServer) *kratos.
 		kratos.Metadata(map[string]string{}),
 		kratos.Logger(logger),
 		kratos.Server(
-			gs,
 			rs,
+			gs,
 		),
 		//kratos.Registrar(reg),
 	)

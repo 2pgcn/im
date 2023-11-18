@@ -18,5 +18,4 @@ COPY --from=builder /src/logic /app
 #COPY --from=builder /src/conf/comet.yaml /app/conf/comet.yaml
 
 
-EXPOSE 8000
-EXPOSE 9000
+#CMD ["/app/logic","-conf=","/app/conf/logic.yaml"]
