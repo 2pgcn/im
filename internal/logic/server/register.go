@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"github.com/2pgcn/gameim/conf"
+	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/2pgcn/gameim/pkg/trace_conf"
 	_ "github.com/go-kratos/kratos/contrib/registry/kubernetes/v2"
 	kuberegistry "github.com/go-kratos/kratos/contrib/registry/kubernetes/v2"
@@ -40,6 +41,7 @@ func (r *OtherServer) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	gamelog.Debug("trace_conf start TracerProvider and set global")
 	otel.SetTracerProvider(tp)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}))
 	return nil

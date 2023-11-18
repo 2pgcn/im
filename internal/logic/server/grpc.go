@@ -4,6 +4,7 @@ import (
 	v1 "github.com/2pgcn/gameim/api/logic"
 	"github.com/2pgcn/gameim/conf"
 	"github.com/2pgcn/gameim/internal/logic/service"
+	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/ratelimit"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
@@ -22,9 +23,9 @@ func NewGRPCServer(c *conf.Server, auth *service.AuthService, logger log.Logger)
 			),
 			recovery.Recovery(),
 			ratelimit.Server(),
-
 		),
 	}
+	gamelog.Debug("trace_conf grcp set TracerProvider export")
 	if c.Grpc.Network != "" {
 		opts = append(opts, grpc.Network(c.Grpc.Network))
 	}
