@@ -11,6 +11,7 @@ spec:
     - port: 9001
       protocol: TCP
       targetPort: 9001
+      nodePort: 31363
   selector:
     run: logic-app001
 ---
