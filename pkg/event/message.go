@@ -1,6 +1,7 @@
 package event
 
 import (
+	"fmt"
 	"github.com/2pgcn/gameim/api/comet"
 	"github.com/segmentio/kafka-go"
 	"strconv"
@@ -58,4 +59,8 @@ func (m *Msg) Value() (res []byte) {
 
 func (m *Msg) RawValue() any {
 	return m.Data
+}
+
+func (m *Msg) String() string {
+	return fmt.Sprintf("head:%+v:key:%s,data:%+v", m.Header(), string(m.Key()), m.RawValue())
 }

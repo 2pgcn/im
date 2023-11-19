@@ -58,7 +58,7 @@ func NewServer(ctx context.Context, c *conf.CometConfig, wg *sync.WaitGroup, log
 	if err != nil {
 		return server, err
 	}
-	//启动app
+	//启动所有app,目前从配置里读,改成从数据中心取
 	for _, v := range c.GetAppConfig() {
 		tmpApp, err := NewApp(ctx, v, rcvQueue, log)
 		if err != nil {
@@ -130,7 +130,6 @@ func (s *Server) handleComet(ctx context.Context, conn *net.TCPConn) {
 	s.log.Debug("protocol.OpAuth pass")
 	grpcCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
 	defer cancel()
-	//开始记录链路信息
 	authReply, err := s.logic.OnAuth(grpcCtx, &logic.AuthReq{
 		Token: string(p.Data),
 	})
@@ -203,7 +202,7 @@ func (s *Server) handleComet(ctx context.Context, conn *net.TCPConn) {
 			if errors.Is(err, protocol.ErrInvalidBuffer) {
 				continue
 			}
-			s.log.Errorf("")
+			s.log.Error(err)
 			break
 		}
 		msgCtx, span := trace_conf.SetTrace(context.Background(), trace_conf.COMET_RECV_CIENT_MSG,

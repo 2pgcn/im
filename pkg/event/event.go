@@ -13,6 +13,7 @@ type Event interface {
 	Value() []byte
 	RawValue() any
 	StartTrace(traceName string)
+	String() string
 }
 
 func NewHeader(size int) EventHeader {

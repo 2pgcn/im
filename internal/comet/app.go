@@ -61,7 +61,7 @@ func (a *App) queueHandle() (err error) {
 			return a.receiver.Close()
 		default:
 			msg, err := a.receiver.Receive(a.ctx)
-			a.log.Debug(msg)
+			a.log.Debugf("msg:%s", msg)
 			if err != nil {
 				a.GetLog().Errorf("message error:%s", err)
 				continue
