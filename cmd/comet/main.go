@@ -35,7 +35,7 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		cometConfig := conf.InitCometConfig(CfgFile)
 		//todo add to conf
-		l := gamelog.GetZapLog(zapcore.DebugLevel, 2)
+		l := gamelog.GetZapLog(zapcore.InfoLevel, 2)
 		zlog := gamelog.NewHelper(l)
 		trace_conf.SetTraceConfig(cometConfig.UpData.TraceConf)
 		if err := startTrace(); err != nil {
@@ -76,7 +76,6 @@ func main() {
 }
 
 func startTrace() error {
-	return nil
 	tp, err := trace_conf.GetTracerProvider()
 	if err != nil {
 		return err
@@ -87,6 +86,5 @@ func startTrace() error {
 }
 
 func startPyroscope(appname, version, endpoint string, logger pyroscope.Logger) error {
-	return nil
 	return pprof.InitPyroscope(appname, version, endpoint, logger)
 }

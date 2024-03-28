@@ -44,7 +44,7 @@ func init() {
 }
 
 func initLog() log.Logger {
-	l := gamelog.GetZapLog(zapcore.DebugLevel, 2)
+	l := gamelog.GetZapLog(zapcore.InfoLevel, 2)
 	return gamelog.NewHelper(l)
 	//
 	//writeSyncer := zapcore.AddSync(os.Stdout)
