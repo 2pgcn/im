@@ -3,9 +3,11 @@ package comet
 import (
 	"bufio"
 	"context"
-	"github.com/2pgcn/gameim/api/comet"
+	"errors"
+	"github.com/2pgcn/gameim/api/protocol"
 	"github.com/2pgcn/gameim/pkg/event"
 	"github.com/2pgcn/gameim/pkg/gamelog"
+	"github.com/2pgcn/gameim/pkg/safe"
 	"net"
 	"sync"
 )
@@ -24,40 +26,81 @@ type User struct {
 	ReadBuf  *bufio.Reader
 	WriteBuf *bufio.Writer
 	conn     *net.TCPConn
+	pool     *safe.GoPool
 }
 
 func NewUser(ctx context.Context, conn *net.TCPConn, log gamelog.GameLog) *User {
+	log = log.ReplacePrefix(gamelog.DefaultMessageKey + "user")
+	pool := safe.NewGoPool(ctx)
 	return &User{
 		ctx:      ctx,
 		msgQueue: event.NewChannel(128),
 		conn:     conn,
 		log:      log,
+		pool:     pool,
 	}
 }
 
-func (u *User) Push(m event.Event) (err error) {
-	return u.msgQueue.Send(context.Background(), m)
+func (u *User) Push(ctx context.Context, m event.Event) (err error) {
+	return u.msgQueue.Send(ctx, m)
 }
 
-// Ready check the channel ready or close?
-func (u *User) Pop() (event.Event, error) {
-	return u.msgQueue.Receive(context.Background())
+func (u *User) Pop(ctx context.Context) (res []chan event.Event) {
+	var err error
+	res, err = u.msgQueue.Receive(ctx)
+	if err != nil {
+		u.log.Errorf("pop msg error:%s", err)
+		return
+	}
+	return
+
+}
+
+func (u *User) Start() {
+	chans := u.Pop(u.ctx)
+	for _, v1 := range chans {
+		v := v1
+		u.pool.GoCtx(func(ctx context.Context) {
+			for {
+				select {
+				case <-u.ctx.Done():
+					return
+				case msgEvent := <-v:
+					writeProto, err := msgEvent.ToProtocol()
+					if err != nil {
+						u.log.Errorf("writeProto err: %+v", writeProto)
+						continue
+					}
+					if err = writeProto.WriteTcp(u.WriteBuf); err != nil {
+						u.log.Errorf("writeProto.EncodeTo(user.WriteBuf) error(%v)", err)
+						continue
+					}
+					if msgEvent.GetQueueMsg().Data.Type == protocol.Type_CLOSE {
+						//close
+						event.PutQueueMsg(msgEvent.GetQueueMsg())
+						u.log.Debugf("recv msg close:%v", msgEvent.GetQueueMsg())
+						return
+					}
+				}
+			}
+		})
+	}
 }
 
 // Close the channel.
 func (u *User) Close() {
-	err := u.Push(&event.Msg{
-		Data: &comet.MsgData{
-			Type: comet.Type_CLOSE,
-		}})
-
+	msg := event.GetQueueMsg()
+	u.log.Debug("start close u")
+	msg.Data.Type = protocol.Type_CLOSE
+	err := u.Push(context.Background(), msg)
+	u.log.Debug("start push u")
 	if err != nil {
 		u.log.Errorf("close u.push error %s", err.Error())
 	}
 	u.lock.Lock()
 	defer u.lock.Unlock()
 	err = u.conn.CloseRead()
-	if err != nil {
+	if err != nil && !errors.Is(err, net.ErrClosed) {
 		u.log.Errorf("close error %s", err.Error())
 	}
 }

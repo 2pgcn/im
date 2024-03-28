@@ -3,6 +3,8 @@ syntax = "proto3";
 package conf;
 
 option go_package = "github.com/2pgcn/gameim/conf;conf";
+import "google/protobuf/duration.proto";
+
 
 enum QueueType{
   KAFKA = 0;
@@ -18,7 +20,7 @@ message serverMsg{
 message queueMsg{
   string type = 1;
   Redis redis = 2;
-  Kafka kafka = 3;
+  Nsq nsq = 3;
   message Redis{
     string addr = 1;
     string password = 2;
@@ -36,6 +38,12 @@ message queueMsg{
     string  consumer_group_id = 4;
     int32 partition_num = 5;
   }
+  message Nsq{
+    string topic = 1;
+    string channel = 2;
+    repeated string nsqd_address = 3;
+    repeated string lookupd = 4;
+  }
 }
 
 message sslMsg{
@@ -50,7 +58,7 @@ message tcpMsg{
 }
 message logicClientGrpc{
   string addr = 1;
-  uint32 timeout = 2;
+  google.protobuf.Duration timeout = 2;
 }
 message app_config{
   string appid = 1;
@@ -66,9 +74,15 @@ message CometConfig{
   tcpMsg tcp = 4;
   logicClientGrpc logic_client_grpc = 5;
   repeated app_config app_config = 6;
-  TraceConf TraceConf = 7;
+  UpData up_data = 7;
 }
-
+message UpData{
+    Pyroscope pyroscope = 1;
+    TraceConf trace_conf =2;
+}
+message Pyroscope{
+  string address = 1;
+}
 
 message TraceConf{
   string slsProjectHeader = 1;

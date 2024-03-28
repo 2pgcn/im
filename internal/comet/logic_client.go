@@ -19,7 +19,7 @@ func (c *logicClientTest) OnAuth(ctx context.Context, in *logic.AuthReq, opts ..
 	atomic.AddUint64(&online, 1)
 	uid := atomic.LoadUint64(&online)
 	return &logic.AuthReply{
-		Uid: uid,
+		Uid: strconv.Itoa(int(uid)),
 		//AreaId: uint64(1),
 		RoomId: strconv.FormatUint(uid%10000, 10),
 	}, nil

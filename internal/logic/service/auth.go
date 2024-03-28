@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"github.com/2pgcn/gameim/api/comet"
-	error2 "github.com/2pgcn/gameim/api/error"
 	pb "github.com/2pgcn/gameim/api/logic"
 	"github.com/2pgcn/gameim/conf"
 	"github.com/2pgcn/gameim/internal/logic/data"
@@ -12,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/trace"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	"math/rand"
 	"strconv"
 )
 
@@ -34,11 +33,8 @@ func (s *AuthService) OnAuth(ctx context.Context, req *pb.AuthReq) (*pb.AuthRepl
 	//	return nil, error2.AuthError
 	//}
 	uid := req.GetToken()
-	uidInt, err := strconv.ParseInt(uid, 10, 64)
-	if err != nil {
-		return nil, error2.AuthError
-	}
-	return &pb.AuthReply{Appid: "app001", Uid: uint64(uidInt), RoomId: strconv.Itoa(int(uidInt % 100))}, err
+	r := rand.Intn(100)
+	return &pb.AuthReply{Appid: "app001", Uid: uid, RoomId: strconv.Itoa(r % 100)}, nil
 }
 
 func (s *AuthService) OnConnect(ctx context.Context, req *pb.ConnectReq) (*emptypb.Empty, error) {
@@ -49,16 +45,13 @@ func (s *AuthService) OnConnect(ctx context.Context, req *pb.ConnectReq) (*empty
 func (s *AuthService) OnMessage(ctx context.Context, req *pb.MessageReq) (*emptypb.Empty, error) {
 	ctx, span := otel.Tracer(conf.ServerName).Start(ctx, "OnMessageServices", trace.WithSpanKind(trace.SpanKindInternal))
 	defer span.End()
-	err := s.user.WriteKafkaMessage(ctx, &event.Msg{
-		H: map[string]any{},
-		K: []byte(req.CometKey),
-		Data: &comet.MsgData{
-			Type:   req.Type,
-			ToId:   req.ToId,
-			SendId: req.SendId,
-			Msg:    req.Msg,
-		},
-	})
+	data := event.GetQueueMsg()
+	data.Data.Type = req.Type
+	data.Data.ToId = req.ToId
+	data.Data.SendId = req.SendId
+	data.Data.Msg = req.Msg
+
+	err := s.user.WriteNsqMessage(ctx, data)
 	return &emptypb.Empty{}, err
 }
 

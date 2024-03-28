@@ -3,6 +3,7 @@ package gamelog
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"go.uber.org/zap"
@@ -56,7 +57,7 @@ func (l *ZapLogger) Debug(msg ...any) {
 	_ = l.Log(log.LevelDebug)
 }
 
-func GetZapLog() *ZapLogger {
+func GetZapLog(level zapcore.Level, callerSkip int) *ZapLogger {
 	encoder := zapcore.EncoderConfig{
 		TimeKey:        "t",
 		LevelKey:       "level",
@@ -64,7 +65,7 @@ func GetZapLog() *ZapLogger {
 		CallerKey:      "caller",
 		MessageKey:     "gameim",
 		StacktraceKey:  "stack",
-		EncodeTime:     zapcore.ISO8601TimeEncoder,
+		EncodeTime:     zapcore.TimeEncoderOfLayout(time.DateTime),
 		LineEnding:     zapcore.DefaultLineEnding,
 		EncodeLevel:    zapcore.LowercaseLevelEncoder,
 		EncodeDuration: zapcore.SecondsDurationEncoder,
@@ -72,11 +73,11 @@ func GetZapLog() *ZapLogger {
 	}
 	return NewZapLogger(
 		encoder,
-		zap.NewAtomicLevelAt(zapcore.DebugLevel),
+		zap.NewAtomicLevelAt(level),
 		zap.AddStacktrace(
 			zap.NewAtomicLevelAt(zapcore.ErrorLevel)),
 		zap.AddCaller(),
-		zap.AddCallerSkip(2),
+		zap.AddCallerSkip(callerSkip),
 		zap.Development(),
 	)
 }

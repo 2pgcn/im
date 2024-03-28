@@ -2,8 +2,8 @@ package comet
 
 import (
 	"context"
-	"github.com/2pgcn/gameim/api/comet"
 	"github.com/2pgcn/gameim/pkg/event"
+	"github.com/2pgcn/gameim/pkg/gamelog"
 	"go.uber.org/zap"
 	"net"
 	"reflect"
@@ -37,11 +37,11 @@ func newUser(t testing.TB) *User {
 		t.Errorf("newUser want to TCPListener not %s", reflect.TypeOf(listener))
 	}
 	accept := newAccept(t, l)
-	return NewUser(context.Background(), accept, tLog.Sugar())
+	return NewUser(context.Background(), accept, gamelog.GetGlobalog())
 }
 
 func newUserNotListen(t testing.TB) *User {
-	return NewUser(context.Background(), nil, tLog.Sugar())
+	return NewUser(context.Background(), nil, gamelog.GetGlobalog())
 }
 
 func TestNewUserSendAndRecv(t *testing.T) {
@@ -65,7 +65,10 @@ func TestNewUserSendAndRecv(t *testing.T) {
 func TestUserClose(t *testing.T) {
 	user := newUser(t)
 	user.Close()
-	msgE := user.Pop()
+	msgE, err := user.Pop(context.Background())
+	if err != nil {
+		t.Error(err)
+	}
 	msg := msgE.(*event.Msg)
 	if msg.GetData().Type != comet.Type_CLOSE {
 		t.Errorf("TestUserClose user msg type error")

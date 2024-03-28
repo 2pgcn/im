@@ -4,22 +4,19 @@ import (
 	"bufio"
 	"context"
 	"errors"
-	"github.com/2pgcn/gameim/api/comet"
-	error2 "github.com/2pgcn/gameim/api/error"
+	"github.com/2pgcn/gameim/api/gerr"
 	"github.com/2pgcn/gameim/api/logic"
 	"github.com/2pgcn/gameim/api/protocol"
 	"github.com/2pgcn/gameim/conf"
 	"github.com/2pgcn/gameim/pkg/event"
 	"github.com/2pgcn/gameim/pkg/gamelog"
+	"github.com/2pgcn/gameim/pkg/safe"
 	"github.com/2pgcn/gameim/pkg/trace_conf"
-	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/circuitbreaker"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/middleware/tracing"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/keepalive"
 	//"google.golang.org/grpc"
 	//"google.golang.org/grpc/credentials/insecure"
 	//"google.golang.org/grpc/keepalive"
@@ -31,7 +28,7 @@ import (
 
 type Server struct {
 	ctx     context.Context
-	wg      *sync.WaitGroup
+	gopool  *safe.GoPool
 	listens []*net.TCPListener
 	conf    *conf.CometConfig
 	Name    string
@@ -45,34 +42,37 @@ func (s *Server) logHelper() gamelog.GameLog {
 	return s.log
 }
 
-func NewServer(ctx context.Context, c *conf.CometConfig, wg *sync.WaitGroup, log gamelog.GameLog) (server *Server, err error) {
+func NewServer(ctx context.Context, c *conf.CometConfig, gopool *safe.GoPool, log gamelog.GameLog) (server *Server, err error) {
 	server = &Server{
-		wg:   wg,
-		ctx:  ctx,
-		Name: c.Server.Name,
-		apps: map[string]*App{},
-		conf: c,
+		gopool: gopool,
+		ctx:    ctx,
+		Name:   c.Server.Name,
+		apps:   map[string]*App{},
+		conf:   c,
 	}
 	server.log = log.ReplacePrefix(gamelog.DefaultMessageKey + ":server")
-	rcvQueue, err := event.NewKafkaReceiver(ctx, c.Queue.GetKafka())
+	rcvQueue, err := event.NewNsqReceiver(c.Queue.GetNsq())
 	if err != nil {
-		return server, err
+		return server, gerr.ErrorServerError("NewServer").WithMetadata(gerr.GetStack()).WithCause(err)
+
 	}
 	//启动所有app,目前从配置里读,改成从数据中心取
 	for _, v := range c.GetAppConfig() {
-		tmpApp, err := NewApp(ctx, v, rcvQueue, log)
+		tmpApp, err := NewApp(ctx, v, rcvQueue, log, server.gopool)
 		if err != nil {
-			return server, err
+			return server, gerr.ErrorServerError("NewServer").WithMetadata(gerr.GetStack()).WithCause(err)
 		}
 		server.apps[v.Appid] = tmpApp
+		server.log.Debugf("appid is starting:%+v", v.Appid)
 	}
 	server.logic = newLogicClient(ctx, c.LogicClientGrpc)
-	//启动消费队列消费
 	for _, v := range c.Server.Addrs {
 		addr := v
-		go server.bindConn(ctx, addr)
+		server.gopool.GoCtx(func(ctx context.Context) {
+			server.bindConn(ctx, addr)
+		})
 	}
-	return server, err
+	return server, nil
 }
 
 func (s *Server) bindConn(ctx context.Context, host string) {
@@ -81,16 +81,15 @@ func (s *Server) bindConn(ctx context.Context, host string) {
 	var conn *net.TCPConn
 	var err error
 	if addr, err = net.ResolveTCPAddr("tcp", host); err != nil {
-		s.log.Errorf("net.ResolveTCPAddr(tcp, %s) error(%v)", host, err)
+		s.logHelper().Errorf("net.ResolveTCPAddr(tcp, %s) error(%v)", host, err)
 		return
 	}
 
 	if listener, err = net.ListenTCP("tcp", addr); err != nil {
-		s.log.Errorf("net.ListenTCP(tcp, %s) error(%v)", addr, err)
+		s.logHelper().Errorf("net.ListenTCP(tcp, %s) error(%v)", addr, err)
 		return
 	}
-	s.wg.Add(1)
-	defer s.wg.Done()
+	s.logHelper().Debugf("server listen:%s", addr)
 	s.listens = append(s.listens, listener)
 	for {
 		conn, err = listener.AcceptTCP()
@@ -100,39 +99,53 @@ func (s *Server) bindConn(ctx context.Context, host string) {
 			}
 			return
 		}
-		go s.handleComet(ctx, conn)
+		s.gopool.GoCtx(func(ctx context.Context) {
+			s.handleComet(ctx, conn)
+		})
 	}
 
 }
 
 func (s *Server) handleComet(ctx context.Context, conn *net.TCPConn) {
 	user := NewUser(ctx, conn, s.log)
-	//todo 可以改成从自定义pool里拿,规避gc
+	//todo 可以改成从自定义pool里拿,减少gc
 	user.ReadBuf = bufio.NewReader(conn)
 	user.WriteBuf = bufio.NewWriter(conn)
 
-	//获取用户消息
-	p := &protocol.Proto{}
-	if err := p.DecodeFromBytes(user.ReadBuf); err != nil {
+	p := protocol.ProtoPool.Get()
+	defer func() {
+		p.Reset()
+		protocol.ProtoPool.Put(p)
+	}()
+	//todo pool里获取获取用户消息
+	//var operation = func() error {
+	//	return p.DecodeFromBytes(user.ReadBuf)
+	//}
+	//err := backoff.Retry(safe.OperationWithRecover(operation), backoff.NewExponentialBackOff())
+	err := p.DecodeFromBytes(user.ReadBuf)
+	if err != nil {
 		s.log.Errorf("protocol.DecodeFromBytes(user.ReadBuf, &user.Msg) error(%v)", err)
+		user.Close()
 		return
 	}
+	s.logHelper().Debugf("server msg recv:%+v", p)
 	if p.Op != protocol.OpAuth {
 		//todo return client err msg
-		err := conn.Close()
+		err = conn.Close()
 		if err != nil {
 			s.log.Errorf("conn.Close() error(%v)", err)
 		}
-		s.log.Errorf("protocol.Op != protocol.OpLogin")
+		s.log.Error("protocol.Op != protocol.OpLogin,msg(%)", p)
 		return
 	}
 	//todo 配置超时时间
-	s.log.Debug("protocol.OpAuth pass")
-	grpcCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+	//grpcCtx, cancel := context.WithTimeout(ctx, s.conf.LogicClientGrpc.Timeout.AsDuration())
+	grpcCtx, cancel := context.WithTimeout(ctx, time.Second*2)
 	defer cancel()
 	authReply, err := s.logic.OnAuth(grpcCtx, &logic.AuthReq{
 		Token: string(p.Data),
 	})
+	s.log.Debug("protocol.OpAuth pass")
 	if err != nil {
 		s.log.Errorf("s.logic.OnAuth error(%v)", err)
 		err = conn.Close()
@@ -148,10 +161,13 @@ func (s *Server) handleComet(ctx context.Context, conn *net.TCPConn) {
 	user.RoomId = roomId(authReply.RoomId)
 	var app *App
 	var ok bool
-	s.Lock.Lock()
-	log.Debugf("auth success:reply message:%+v", authReply)
-	if app, ok = s.apps[authReply.Appid]; !ok {
-		p.SendError(error2.AuthAppIdError, protocol.OpAuthReply)
+	s.Lock.RLock()
+	app, ok = s.apps[authReply.Appid]
+	s.Lock.RUnlock()
+	s.log.Debugf("auth success:reply message:%+v", authReply)
+	if !ok {
+		// todo
+		//p.SetError(errors2.TypeStatusCode_AUTH_ERROR, protocol.OpAuthReply)
 		err = p.WriteTcp(user.WriteBuf)
 		if err != nil {
 			user.log.Errorf("auth error:app_id:%s not found ", user.AppId)
@@ -159,7 +175,6 @@ func (s *Server) handleComet(ctx context.Context, conn *net.TCPConn) {
 		}
 	}
 	s.log.Debugf("test appid %s", authReply.Appid)
-	s.Lock.Unlock()
 	bucket := app.GetBucket(user.Uid)
 	bucket.PutUser(user)
 	var writeProto *protocol.Proto
@@ -168,38 +183,17 @@ func (s *Server) handleComet(ctx context.Context, conn *net.TCPConn) {
 		s.log.Errorf("writeProto.EncodeTo(user.WriteBuf) error(%v)", err)
 		return
 	}
-	//发送消息
-	go func() {
-		for {
-			msgEvent, err := user.Pop()
-			if err != nil {
-				s.log.Errorf("user pop msg error:%s", err.Error())
-				continue
-			}
+	//启动用户获取自己msg
+	s.gopool.GoCtx(func(ctx context.Context) {
+		user.Start()
+	})
 
-			msg, ok := msgEvent.(*event.Msg)
-			if !ok {
-				s.log.Errorf("recv msg error,want event.Msg have:%+v", msgEvent)
-				continue
-			}
-			writeProto, err = protocol.NewProtoMsg(msg.GetData().GetType().ToOp(), msg.GetData())
-			if err != nil {
-				s.log.Errorf("writeProto err: %+v", writeProto)
-				continue
-			}
-			if err = writeProto.WriteTcp(user.WriteBuf); err != nil {
-				s.log.Errorf("writeProto.EncodeTo(user.WriteBuf) error(%v)", err)
-				continue
-			}
-		}
-	}()
 	//不断读消息
-	//todo
-	var sendType comet.Type
+	var sendType protocol.Type
 	for {
 		err = p.DecodeFromBytes(user.ReadBuf)
 		if err != nil {
-			if errors.Is(err, protocol.ErrInvalidBuffer) {
+			if errors.Is(err, protocol.ErrInvalidBuffer) || errors.Is(err, protocol.ErrEOFData) {
 				continue
 			}
 			s.log.Error(err)
@@ -211,31 +205,35 @@ func (s *Server) handleComet(ctx context.Context, conn *net.TCPConn) {
 				attribute.String("data", string(p.Data)),
 			))
 		span.End()
-		gamelog.Debugf("test:%s+%+v", "test server", p)
 		switch p.Op {
 		case protocol.OpHeartbeat:
-			//todo 添加到最小堆
+			// 更新最小堆
+			bucket.lock.RLock()
+			bucket.UpHeartTime(user.Uid, time.Now().Add(time.Second*60*3))
+			bucket.lock.Unlock()
 			continue
 		case protocol.OpDisconnect:
+			//心跳堆无需删除,在取出的时候兼容
+			bucket.DeleteUser(user.Uid)
 			//删除用户对应信息
 			return
 		case protocol.OpSendAreaMsg, protocol.OpSendRoomMsg, protocol.OpSendMsg:
 			if p.Op == protocol.OpSendAreaMsg {
 				p.Op = protocol.OpSendAreaMsgReply
-				sendType = comet.Type_APP
+				sendType = protocol.Type_APP
 			}
 			if p.Op == protocol.OpSendRoomMsg {
 				p.Op = protocol.OpSendMsgRoomReply
-				sendType = comet.Type_ROOM
+				sendType = protocol.Type_ROOM
 			}
 			if p.Op == protocol.OpSendMsg {
 				p.Op = protocol.OpSendMsgReply
-				sendType = comet.Type_PUSH
+				sendType = protocol.Type_PUSH
 			}
 
 			_, err = s.logic.OnMessage(msgCtx, &logic.MessageReq{
 				Type:     sendType,
-				SendId:   uint64(user.Uid),
+				SendId:   string(user.Uid),
 				ToId:     string(1), //p.Data
 				Msg:      p.Data,
 				CometKey: s.Name,
@@ -270,28 +268,30 @@ func newLogicClient(ctx context.Context, c *conf.LogicClientGrpc) logic.LogicCli
 	conn, err := trgrpc.DialInsecure(
 		ctx,
 		trgrpc.WithEndpoint(c.Addr),
+		trgrpc.WithTimeout(time.Second*3),
 		trgrpc.WithMiddleware(
 			tracing.Client(tracing.WithTracerProvider(provider), tracing.WithTracerName("gameim")),
 			recovery.Recovery(),
 			circuitbreaker.Client(),
 		),
-		trgrpc.WithOptions(
-			grpc.WithInitialWindowSize(grpcInitialWindowSize),
-			grpc.WithInitialWindowSize(grpcInitialWindowSize),
-			grpc.WithInitialConnWindowSize(grpcInitialConnWindowSize),
-			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcMaxCallMsgSize)),
-			grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(grpcMaxSendMsgSize)),
-			grpc.WithKeepaliveParams(keepalive.ClientParameters{
-				Time:                grpcKeepAliveTime,
-				Timeout:             grpcKeepAliveTimeout,
-				PermitWithoutStream: true,
-			}),
-		),
+		//trgrpc.WithOptions(
+		//	grpc.WithInitialWindowSize(grpcInitialWindowSize),
+		//	grpc.WithInitialWindowSize(grpcInitialWindowSize),
+		//	grpc.WithInitialConnWindowSize(grpcInitialConnWindowSize),
+		//	grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcMaxCallMsgSize)),
+		//	grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(grpcMaxSendMsgSize)),
+		//	grpc.WithKeepaliveParams(keepalive.ClientParameters{
+		//		Time:                grpcKeepAliveTime,
+		//		Timeout:             grpcKeepAliveTimeout,
+		//		PermitWithoutStream: true,
+		//	}),
+		//),
 		//grpc.WithTransportCredentials(insecure.NewCredentials()), //todo 安全验证
 	)
 	if err != nil {
 		panic(err)
 	}
+	gamelog.Debugf("start grpc client:%s", c.Addr)
 	return logic.NewLogicClient(conn)
 }
 
@@ -303,10 +303,11 @@ func (s *Server) Close() {
 			s.log.Errorf("Server Close err:%s", err.Error())
 		}
 	}
-	s.Lock.Lock()
-	defer s.Lock.Unlock()
+	s.logHelper().Debug("listen is stop")
+	s.Lock.RLock()
+	defer s.Lock.RUnlock()
 	for _, v := range s.apps {
 		v.Close()
 	}
-
+	s.logHelper().Debug("apps is stop")
 }

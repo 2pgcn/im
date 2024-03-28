@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package protocol;
+
+option go_package = "github.com/2pgcn/gameim/api/protocol;protocol";
+
+
+enum Type {
+  APP = 0;
+  ROOM = 1;
+  PUSH = 2;
+  CLOSE = 3;
+}
+
+//comet后续消息格式
+message Msg{
+  Type type = 1;
+  string to_id = 2;
+  string send_id = 3;
+  bytes msg = 4;
+}
+
+//reply回复消息
+message Reply{
+  int32 code = 1;
+  Msg msg = 2;
+}

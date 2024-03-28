@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package conf;
+
+option go_package = "github.com/2pgcn/main;main";
+import "google/protobuf/duration.proto";
+
+
+message Nsq{
+  string topic = 1;
+  string channel = 2;
+  repeated string nsqd_address = 3;
+  string lookupd = 4;
+}
+message BenchConf{
+   Nsq nsq = 1;
+}

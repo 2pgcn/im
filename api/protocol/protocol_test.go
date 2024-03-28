@@ -1,11 +1,18 @@
 package protocol
 
 import (
-	"runtime"
+	"bufio"
+	"github.com/2pgcn/gameim/pkg/safe"
+	"google.golang.org/protobuf/proto"
+	"net"
 	"testing"
 )
 
 func BenchmarkTest(b *testing.B) {
+	pool := safe.NewPool(func() any {
+		return make([]byte, HeaderLen+16)
+	})
+	pool.Grow(10240)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		p := &Proto{
@@ -15,60 +22,45 @@ func BenchmarkTest(b *testing.B) {
 			Seq:      1,
 			Data:     []byte("hello world"),
 		}
-		data := make([]byte, len(p.Data)+HeaderLen)
+		data := pool.Get().([]byte)
 		err := p.SerializeTo(data)
 		if err != nil {
 			b.Fatal(err)
 		}
-		//p1, err := DecodeFromBytes(data)
-		//if err != nil {
-		//	b.Fatal(err)
-		//}
-		//if p1.Version != p.Version || p1.Op != p.Op || p1.Checksum != p.Checksum || p1.Seq != p.Seq || string(p1.Data) != string(p.Data) {
-		//	b.Fatalf("not equal %+v", p1)
-		//}
+		//pool.Put(data)
 	}
-	runtime.GC()
 }
 
-func TestProto_SerializeTo(t *testing.T) {
-	type fields struct {
-		Version  uint16
-		Op       uint16
-		Checksum uint16
-		Seq      uint16
-		Data     []byte
-	}
-	tests := []struct {
-		name    string
-		fields  fields
-		wantErr bool
-	}{
-		{
-			name: "TestProto_DecodeFromBytes",
-			fields: fields{
-				Version:  1,
-				Op:       1,
-				Checksum: 1,
-				Seq:      1,
-				Data:     []byte{1},
-			},
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			p := &Proto{
-				Version:  tt.fields.Version,
-				Op:       tt.fields.Op,
-				Checksum: tt.fields.Checksum,
-				Seq:      tt.fields.Seq,
-				Data:     tt.fields.Data,
-			}
-			data := make([]byte, HeaderLen)
-			if err := p.SerializeTo(data); (err != nil) != tt.wantErr {
-				t.Errorf("Proto.DecodeFromBytes() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
-	}
+func TestSerializeTo(t *testing.T) {
+	server, client := net.Pipe()
+	cliBuf := bufio.NewWriter(client)
+	serBuf := bufio.NewReader(server)
+	hcProto := ProtoPool.Get()
+	hcProto.Op = OpSendAreaMsg
+	hcProto.Seq = 1
+	hcProto.Data, _ = proto.Marshal(&Msg{
+		Type:   Type_ROOM,
+		ToId:   "1",
+		SendId: "1",
+		Msg:    []byte("hello world gameim"),
+	})
+	step := make(chan bool)
+	hsProto := ProtoPool.Get()
+	go func() {
+		err := hcProto.writeTcp(cliBuf)
+		if err != nil {
+			t.Error(err)
+		}
+	}()
+	go func() {
+		err := hsProto.DecodeFromBytes(serBuf)
+		if err != nil {
+			t.Error(err)
+		}
+		if hcProto.Op != hsProto.Op || hcProto.Seq != hsProto.Seq || len(hcProto.Data) != len(hsProto.Data) {
+			t.Errorf("client write(%v):server read error,data(%v)", hcProto, hsProto)
+		}
+		step <- true
+	}()
+	<-step
 }

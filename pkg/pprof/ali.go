@@ -4,7 +4,9 @@ import (
 	"errors"
 	"github.com/grafana/pyroscope-go"
 	"os"
+	"runtime"
 	"sync"
+	"time"
 )
 
 var profiler *pyroscope.Profiler
@@ -16,8 +18,8 @@ func GetProfiler() *pyroscope.Profiler {
 	return profiler
 }
 func InitPyroscope(appName string, version string, endpoint string, log pyroscope.Logger) (err error) {
-	//runtime.SetMutexProfileFraction(5)
-	//runtime.SetBlockProfileRate(5)
+	runtime.SetMutexProfileFraction(5)
+	runtime.SetBlockProfileRate(5)
 	if isInit {
 		return
 	}
@@ -29,6 +31,7 @@ func InitPyroscope(appName string, version string, endpoint string, log pyroscop
 		ServerAddress:   endpoint,
 		Logger:          log,
 		Tags:            map[string]string{"hostname": os.Getenv("HOSTNAME"), "environment": "test", "version": version},
+		UploadRate:      time.Second * 30,
 		ProfileTypes: []pyroscope.ProfileType{
 			pyroscope.ProfileCPU,
 			pyroscope.ProfileAllocObjects,

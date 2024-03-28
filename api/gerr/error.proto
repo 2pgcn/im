@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package gerr;
+import "errors/errors.proto";
+option go_package = "github.com/2pgcn/gameim/api/gerr;gerr";
+
+
+enum TypeStatusCode {
+	option (errors.default_code) = 500;
+	DEFAULT_SUCCESS = 0;
+	SERVER_ERROR = 1;
+	AUTH_ERROR = 2;
+	AUTH_APPID_ERROR =3;
+}
+
+//logic
+enum ErrorReason {
+	GREETER_UNSPECIFIED = 0;
+	USER_NOT_FOUND = 1;
+	USER_AUTH_ERROR = 2;
+	Internal_Error = 3;
+}
+
+
+
+

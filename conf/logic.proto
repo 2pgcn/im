@@ -44,6 +44,7 @@ message Server {
   GRPC grpc = 2;
   Register register = 3;
   TraceConf traceConf = 4;
+  string pyroscope_address = 5;
 }
 
 message Data {
@@ -77,7 +78,13 @@ message Data {
     string consumerGroupId = 4;
     string group = 5;
   }
+  message Nsq{
+    string topic = 1;
+    string channel = 2;
+    repeated string address = 3;
+  }
   Mysql mysql = 1;
   Redis redis = 2;
-  Kafka kafka = 3;
+  //Kafka kafka = 3;
+  Nsq nsq = 3;
 }

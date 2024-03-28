@@ -1,6 +1,7 @@
 package comet
 
 import (
+	"context"
 	"github.com/2pgcn/gameim/pkg/event"
 	"sync"
 )
@@ -54,10 +55,10 @@ func (r *Room) ExitRoom(u userId) {
 	r.Online--
 }
 
-func (r *Room) Push(m event.Event) error {
+func (r *Room) Push(ctx context.Context, m event.Event) error {
 	r.lock.RLock()
 	for _, u := range r.users {
-		err := u.Push(m)
+		err := u.Push(ctx, m)
 		if err != nil {
 			r.lock.RUnlock()
 			return err

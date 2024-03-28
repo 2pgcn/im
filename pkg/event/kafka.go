@@ -1,9 +1,12 @@
+//go:build ignore
+// +build ignore
+
 package event
 
 import (
 	"context"
 	"fmt"
-	"github.com/2pgcn/gameim/api/comet"
+	"github.com/2pgcn/gameim/api/protocol"
 	"github.com/2pgcn/gameim/conf"
 	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/2pgcn/gameim/pkg/trace_conf"
@@ -26,7 +29,6 @@ func (s *kafkaSender) Send(ctx context.Context, message Event) error {
 	otel.GetTextMapPropagator().Inject(ctx, message.(*Msg))
 	err := s.writer.WriteMessages(ctx, kafka.Message{
 		Headers: message.Header().GetKafkaHead(),
-		Key:     message.Key(),
 		Value:   message.Value(),
 	})
 	if err != nil {
@@ -74,8 +76,8 @@ func (k *kafkaReceiver) Receive(ctx context.Context) (e Event, err error) {
 	if err != nil {
 		return e, err
 	}
-	var msgData comet.MsgData
-	err = proto.Unmarshal(m.Value, &msgData)
+	var msg protocol.Msg
+	err = proto.Unmarshal(m.Value, &msg)
 	if err != nil {
 		return e, err
 	}
@@ -92,8 +94,7 @@ func (k *kafkaReceiver) Receive(ctx context.Context) (e Event, err error) {
 	//将topic,par,offset 保存到head处理完后提交
 	e = &Msg{
 		H:    header,
-		K:    m.Key,
-		Data: &msgData,
+		Data: &msg,
 	}
 	gamelog.Debug(m.Headers, e.Header())
 	ctxTra := otel.GetTextMapPropagator().Extract(context.Background(), e.(*Msg))

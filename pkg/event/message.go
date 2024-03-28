@@ -1,38 +1,89 @@
 package event
 
 import (
+	"encoding/json"
 	"fmt"
-	"github.com/2pgcn/gameim/api/comet"
+	"github.com/2pgcn/gameim/api/gerr"
+	"github.com/2pgcn/gameim/api/protocol"
+	"github.com/2pgcn/gameim/pkg/gamelog"
+	"github.com/2pgcn/gameim/pkg/safe"
+	"github.com/golang/protobuf/proto"
 	"github.com/segmentio/kafka-go"
 	"strconv"
+	"sync"
 )
 
-//var (
-//	_ event.Sender   = (*kafkaSender)(nil)
-//	_ event.Receiver = (*kafkaReceiver)(nil)
-//	_ event.Event    = (*Message)(nil)
-//)
+var queueMsgPool *safe.Pool[*queueMsg]
+var msgPool *safe.Pool[*protocol.Msg]
+var defaultPoolSize = 4096
+var once sync.Once
 
-type Msg struct {
-	traceName string
-	H         EventHeader
-	K         []byte
-	Data      *comet.MsgData
+func init() {
+	once.Do(func() {
+		msgPool = safe.NewPool(func() *protocol.Msg {
+			return &protocol.Msg{}
+		})
+		msgPool.Grow(defaultPoolSize)
+		queueMsgPool = safe.NewPool(func() *queueMsg {
+			return &queueMsg{
+				H:    make(map[string]any, 8),
+				Data: msgPool.Get(),
+			}
+		})
+		queueMsgPool.Grow(defaultPoolSize)
+	})
 }
 
-func (m *Msg) StartTrace(traceName string) {
+type queueMsg struct {
+	traceName string
+	H         EventHeader
+	Data      *protocol.Msg
+}
+
+func GetQueueMsg() *queueMsg {
+	return queueMsgPool.Get()
+}
+func PutQueueMsg(m *queueMsg) {
+	if m.Data != nil {
+		msgPool.Put(m.Data)
+		m.Data = nil
+	}
+	queueMsgPool.Put(m)
+}
+
+func GetMsg() *protocol.Msg {
+	return msgPool.Get()
+}
+func PutMsg(m *protocol.Msg) {
+	msgPool.Put(m)
+}
+
+func (m *queueMsg) StartTrace(traceName string) {
 	m.traceName = traceName
 }
 
-func (m *Msg) GetData() *comet.MsgData {
-	return m.Data
-}
-
-func (m *Msg) Header() EventHeader {
+func (m *queueMsg) Header() EventHeader {
 	return m.H
 }
+func (m *queueMsg) GetQueueMsg() *queueMsg {
+	return m
+}
+func (m *queueMsg) ToProtocol() (p *protocol.Proto, err error) {
+	p = protocol.ProtoPool.Get()
+	p.Version = protocol.Version
+	p.Op = m.Data.Type.ToOp()
+	reply, err := proto.Marshal(&protocol.Reply{
+		Code: 0,
+		Msg:  m.Data,
+	})
+	if err != nil {
+		return p, gerr.ErrorServerError("protocol error,queuedata:%+v", m).WithMetadata(gerr.GetStack()).WithCause(err)
+	}
+	p.Data = reply
+	return
+}
 
-func (m *Msg) GetKafkaCommitMsg() (kmsg kafka.Message, err error) {
+func (m *queueMsg) GetKafkaCommitMsg() (kmsg kafka.Message, err error) {
 	var (
 		partitionStrInt int64
 		offset          int64
@@ -46,21 +97,16 @@ func (m *Msg) GetKafkaCommitMsg() (kmsg kafka.Message, err error) {
 	kmsg.Offset = offset
 	return kmsg, err
 }
-func (m *Msg) Key() []byte {
-	return m.K
-}
-func (m *Msg) Value() (res []byte) {
+
+func (m *queueMsg) Value() (res []byte) {
 	var err error
-	if res, err = m.GetData().Marshal(); err != nil {
-		return nil
+	if res, err = json.Marshal(m); err != nil {
+		gamelog.Errorf("queue msg error:%+v", m)
+		return []byte{}
 	}
 	return res
 }
 
-func (m *Msg) RawValue() any {
-	return m.Data
-}
-
-func (m *Msg) String() string {
-	return fmt.Sprintf("head:%+v:key:%s,data:%+v", m.Header(), string(m.Key()), m.RawValue())
+func (m *queueMsg) String() string {
+	return fmt.Sprintf("head:%+v,data:%+v", m.Header(), m.Data)
 }

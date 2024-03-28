@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"github.com/2pgcn/gameim/internal/logic/server"
 	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/2pgcn/gameim/pkg/pprof"
@@ -11,7 +10,7 @@ import (
 	"github.com/grafana/pyroscope-go"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
-	"net/http"
+	"go.uber.org/zap/zapcore"
 	"os"
 
 	"github.com/2pgcn/gameim/conf"
@@ -45,7 +44,7 @@ func init() {
 }
 
 func initLog() log.Logger {
-	l := gamelog.GetZapLog()
+	l := gamelog.GetZapLog(zapcore.DebugLevel, 2)
 	return gamelog.NewHelper(l)
 	//
 	//writeSyncer := zapcore.AddSync(os.Stdout)
@@ -105,11 +104,9 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	if port := os.Getenv("ILOGTAIL_PROFILE_PORT"); len(port) > 0 {
-		startPprof(fmt.Sprintf(":", port))
-	}
+
 	//todo 加配置里
-	err = startPyroscope(Name, Version, "http://node1.2pg.cn:4040", gamelog.GetGlobalog())
+	err = startPyroscope(Name, Version, bc.Server.PyroscopeAddress, gamelog.GetGlobalog())
 	if err != nil {
 		panic(err)
 	}
@@ -123,12 +120,6 @@ func main() {
 	if err := app.Run(); err != nil {
 		panic(err)
 	}
-}
-
-func startPprof(port string) {
-	go func() {
-		_ = http.ListenAndServe(port, nil)
-	}()
 }
 
 func startPyroscope(appname, version, endpoint string, logger pyroscope.Logger) error {

@@ -8,10 +8,14 @@ GAMEIMVERSION=$(shell git describe --tags --always)
 ifeq ($(GOHOSTOS), windows)
 	Git_Bash=$(subst \,/,$(subst cmd\,bin\bash.exe,$(dir $(shell where git))))
 	CONF_PROTO_FILES=$(shell $(Git_Bash) -c "find conf -name *.proto")
+	BENCH_PROTO_FILES=$(shell $(Git_Bash) -c "find benchmark -name *.proto")
     API_PROTO_FILES=$(shell $(Git_Bash) -c "find api -name *.proto")
+    ERROR_PROTO_FILES=$(shell $(Git_Bash) -c "find api/gerr -name *.proto")
 else
 	CONF_PROTO_FILES=$(shell find conf -name *.proto)
+	BENCH_PROTO_FILES=$(shell find benchmark -name *.proto)
 	API_PROTO_FILES=$(shell find api -name *.proto)
+	ERROR_PROTO_FILES=$(shell find api/gerr -name *.proto)
 endif
 
 .PHONY: conf
@@ -21,6 +25,13 @@ conf:
 		   --proto_path=./third_party \
 		   --go_out=paths=source_relative:./conf \
 		   $(CONF_PROTO_FILES)
+	make benchmark
+.PHONY: benchmark
+benchmark:
+	protoc --proto_path=./benchmark \
+    	   --go_out=paths=source_relative:./benchmark \
+    		$(BENCH_PROTO_FILES)
+
 .PHONY: api
 # generate conf proto
 api:
@@ -29,7 +40,14 @@ api:
 		   --go_out=paths=source_relative:./api \
 		   --go-http_out=paths=source_relative:./api \
 		   $(API_PROTO_FILES)
-
+.PHONY: errors
+# generate conf proto
+errors:
+	protoc --proto_path=./api/gerr \
+		   --proto_path=./third_party \
+		   --go_out=paths=source_relative:. \
+		   --go-errors_out=paths=source_relative:./api/gerr \
+		   $(ERROR_PROTO_FILES)
 # generate
 generate:
 	go mod tidy

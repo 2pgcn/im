@@ -2,11 +2,12 @@ package comet
 
 import (
 	"context"
-	"github.com/2pgcn/gameim/api/comet"
+	"github.com/2pgcn/gameim/api/protocol"
 	"github.com/2pgcn/gameim/conf"
 	"github.com/2pgcn/gameim/pkg/event"
 	"github.com/2pgcn/gameim/pkg/gamelog"
-	"strconv"
+	"github.com/2pgcn/gameim/pkg/safe"
+	"math/rand"
 	"sync"
 )
 
@@ -17,6 +18,7 @@ type App struct {
 	lock     sync.RWMutex
 	log      gamelog.GameLog
 	receiver event.Receiver
+	gopool   *safe.GoPool
 }
 
 func (a *App) GetLog() gamelog.GameLog {
@@ -24,30 +26,36 @@ func (a *App) GetLog() gamelog.GameLog {
 	return a.log
 }
 
+// todo 修改下hash
 func (a *App) GetBucketIndex(userid userId) int {
-	return int(uint64(userid) % uint64(len(a.Buckets)))
+	return rand.Intn(len(a.Buckets))
 }
 
 // NewApp todo 暂时写死app 需要改为从存储中获取 config改成app config
-func NewApp(ctx context.Context, c *conf.AppConfig, receiver event.Receiver, l gamelog.GameLog) (*App, error) {
+func NewApp(ctx context.Context, c *conf.AppConfig, receiver event.Receiver, l gamelog.GameLog, gopool *safe.GoPool) (*App, error) {
 	app := &App{
 		ctx:      ctx,
 		Appid:    c.Appid,
 		Buckets:  make([]*Bucket, c.BucketNum),
 		log:      l,
 		receiver: receiver,
+		gopool:   gopool,
 	}
 
 	for i := 0; i < int(c.BucketNum); i++ {
 		app.Buckets[i] = NewBucket(ctx, l)
 	}
-	go func() {
-		err := app.queueHandle()
-		if err != nil {
-
-		}
-	}()
 	return app, nil
+}
+
+func (a *App) Start() error {
+	a.gopool.GoCtx(func(ctx context.Context) {
+		err := a.queueHandle()
+		if err != nil {
+			a.GetLog().Errorf("app start queueHandle error:%s", err)
+		}
+	})
+	return nil
 }
 
 func (a *App) GetBucket(userId userId) *Bucket {
@@ -55,51 +63,40 @@ func (a *App) GetBucket(userId userId) *Bucket {
 }
 
 func (a *App) queueHandle() (err error) {
-	for {
-		select {
-		case <-a.ctx.Done():
-			return a.receiver.Close()
-		default:
-			msg, err := a.receiver.Receive(a.ctx)
-			a.log.Debugf("msg:%s", msg)
-			if err != nil {
-				a.GetLog().Errorf("message error:%s", err)
-				continue
-			}
-			msgData, ok := msg.RawValue().(*comet.MsgData)
-			if !ok {
-				continue
-			}
-			switch msgData.GetType() {
-			case comet.Type_PUSH:
-				uidInt, err := strconv.ParseUint(msgData.ToId, 10, 64)
-				if err != nil {
-					a.GetLog().Errorf("uidInt parse error:%s", err)
-				}
-				bucket := a.GetBucket(userId(uidInt))
-				if user, ok := bucket.users[userId(uidInt)]; ok {
-					err = user.Push(msg)
-					if err != nil {
-						a.GetLog().Errorf("user.Push error:%s", err.Error())
-					}
-				} else {
-					a.GetLog().Errorf("user not exist:%d", msgData.ToId)
-				}
-			case comet.Type_ROOM, comet.Type_APP:
-				a.broadcast(msg)
-			// todo add func
-			//case comet.Type_CLOSE:
-			//	if user, ok := bucket.users[cometMsg.ToId]; ok {
-			//		_ = user.Close()
-			//	}
-			default:
-				a.GetLog().Errorf("unknown msg type:%d", msgData.GetType())
-			}
-			if err != nil {
-				a.GetLog().Errorf("queueHandle %s", err)
-			}
-		}
+	receiverQueues, err := a.receiver.Receive(a.ctx)
+	if err != nil {
+		a.GetLog().Errorf("queueHandle error:%s", err)
+		return err
 	}
+	for _, q1 := range receiverQueues {
+		q := q1
+		a.gopool.GoCtx(func(ctx context.Context) {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case m := <-q:
+					msg := m.GetQueueMsg()
+					switch msg.Data.Type {
+					case protocol.Type_PUSH:
+						bucket := a.GetBucket(userId(msg.Data.GetToId()))
+						if user, ok := bucket.users[userId(msg.Data.GetToId())]; ok {
+							err = user.Push(a.ctx, m)
+							if err != nil {
+								a.GetLog().Errorf("user.Push error:%s", err.Error())
+							}
+						} else {
+							a.GetLog().Errorf("user not exist:%d", msg.Data.GetToId())
+						}
+					case protocol.Type_ROOM, protocol.Type_APP:
+						a.broadcast(m)
+
+					}
+				}
+			}
+		})
+	}
+	return nil
 }
 
 // 广播工会消息
@@ -108,17 +105,14 @@ func (a *App) broadcast(c event.Event) {
 	for _, v := range a.Buckets {
 		v.broadcast(c)
 	}
+
 }
 
 func (a *App) Close() {
-	a.broadcast(&event.Msg{
-		Data: &comet.MsgData{
-			Type:   comet.Type_CLOSE,
-			ToId:   "",
-			SendId: 0,
-			Msg:    []byte("server close"),
-		},
-	})
+	msg := event.GetQueueMsg()
+	msg.Data.Type = protocol.Type_CLOSE
+	a.broadcast(msg)
+	a.GetLog().Debug("app broadcast close success")
 	for _, v := range a.Buckets {
 		v.Close()
 	}
@@ -126,5 +120,6 @@ func (a *App) Close() {
 	if err != nil {
 		a.GetLog().Errorf("%s:", err.Error())
 	}
+	a.GetLog().Debug("app receiver close success")
 
 }

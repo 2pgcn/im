@@ -2,19 +2,55 @@ package protocol
 
 import (
 	"bufio"
-	"bytes"
 	"encoding/binary"
 	"errors"
-	error2 "github.com/2pgcn/gameim/api/error"
-	"github.com/cenkalti/backoff/v4"
+	"github.com/2pgcn/gameim/pkg/safe"
 	"github.com/golang/protobuf/proto"
+	"io"
 	"math"
+	"net"
+	"sync"
 )
 
 // todo 改成自定义包
 var (
 	ErrInvalidBuffer = errors.New("invalid protocol")
+	ErrEOFData       = errors.New("IO EOF")
 )
+var Version = uint16(1)
+
+// todo 添加到配置里
+var ProtoPool *safe.Pool[*Proto]
+var ones sync.Once
+
+// todo 将bufio重写,共
+// var bytesPool *safe.BytePool
+var headerPool *sync.Pool
+var dataPool *sync.Pool
+var defaultSize = 1024
+var defaultNum = 1024
+
+func init() {
+	ones.Do(func() {
+		ProtoPool = safe.NewPool(func() *Proto {
+			return &Proto{
+				Version:  1,
+				Op:       0,
+				Checksum: 0,
+				Seq:      0,
+				Data:     nil,
+			}
+		})
+		ProtoPool.Grow(defaultNum)
+		headerPool = &sync.Pool{
+			New: func() any {
+				return make([]byte, HeaderLen)
+			}}
+		dataPool = &sync.Pool{New: func() any {
+			return make([]byte, defaultSize)
+		}}
+	})
+}
 
 const (
 	OpHeartbeat      = uint16(0)
@@ -55,12 +91,12 @@ const (
 	seqSizeOffset      = opSizeOffset + seqSize
 )
 
-type Proto struct {
-	Version  uint16 //2 byte 16 bit
-	Op       uint16
-	Checksum uint16
-	Seq      uint16
-	Data     []byte
+func (p *Proto) Reset() {
+	p.Version = 1
+	p.Op = 0
+	p.Checksum = 0
+	p.Seq = 0
+	p.Data = []byte{}
 }
 
 // SerializeTo todo checksum
@@ -81,11 +117,11 @@ func (p *Proto) SerializeTo(bytes []byte) (err error) {
 
 // WriteTcp default Retry 3
 func (p *Proto) WriteTcp(writer *bufio.Writer) (err error) {
-	operation := func() error {
-		return p.writeTcp(writer)
-	}
-	err = backoff.Retry(operation, backoff.NewExponentialBackOff())
-	return err
+	//operation := func() error {
+	//	return p.writeTcp(writer)
+	//}
+	//err = backoff.Retry(operation, backoff.NewExponentialBackOff())
+	return p.writeTcp(writer)
 }
 
 func (p *Proto) writeTcp(writer *bufio.Writer) (err error) {
@@ -107,8 +143,14 @@ func (p *Proto) writeTcp(writer *bufio.Writer) (err error) {
 }
 
 func (p *Proto) DecodeFromBytes(b *bufio.Reader) (err error) {
-	bufio.NewReader(bytes.NewReader([]byte{}))
-	headBuf := make([]byte, HeaderLen)
+	if _, err = b.Peek(HeaderLen); err != nil {
+		var opErr *net.OpError
+		if errors.Is(err, io.EOF) || errors.As(err, &opErr) || opErr.Timeout() {
+			return ErrEOFData
+		}
+	}
+	headBuf := headerPool.Get().([]byte)
+	defer headerPool.Put(headBuf)
 	if err = binary.Read(b, binary.BigEndian, &headBuf); err != nil {
 		return
 	}
@@ -122,10 +164,12 @@ func (p *Proto) DecodeFromBytes(b *bufio.Reader) (err error) {
 	p.Checksum = binary.BigEndian.Uint16(headBuf[versionSizeOffset:checksumSizeOffset])
 	p.Op = binary.BigEndian.Uint16(headBuf[checksumSizeOffset:opSizeOffset])
 	p.Seq = binary.BigEndian.Uint16(headBuf[opSizeOffset:seqSizeOffset])
-	p.Data = make([]byte, packLen-HeaderLen)
+	//超出bytesPool长度
+	p.Data = make([]byte, packLen-uint32(headerLen))
 	if err = binary.Read(b, binary.BigEndian, &p.Data); err != nil {
 		return
 	}
+
 	return
 }
 
@@ -147,18 +191,19 @@ func Checksum(data []byte, csum uint32) uint16 {
 	return ^uint16(csum)
 }
 
-func (p *Proto) SendError(err *error2.Error, op uint16) {
-	p.Op = op
-	p.Data = err.Marshal()
-}
+//// SetError todo 循环依赖
+//func (p *Proto) SetError(err *error2.Error, op uint16) {
+//	p.Op = op
+//	p.Data = nil
+//}
 
 func NewProtoMsg(op uint16, msg proto.Message) (*Proto, error) {
 	data, err := proto.Marshal(msg)
-	return &Proto{
-		Version:  1,
-		Op:       op,
-		Checksum: 0,
-		Seq:      0,
-		Data:     data,
-	}, err
+	if err != nil {
+		return nil, err
+	}
+	m := ProtoPool.Get()
+	m.Op = op
+	m.Data = data
+	return m, nil
 }

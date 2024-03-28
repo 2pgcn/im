@@ -14,6 +14,11 @@ type GameLog interface {
 	log.Logger
 	LogPrint
 	ReplacePrefix(s string) GameLog
+	NsqLog
+}
+
+type NsqLog interface {
+	Output(calldepth int, s string) error
 }
 
 type LogPrint interface {
@@ -124,4 +129,10 @@ func (h *LogHelper) Fatal(a ...interface{}) {
 func (h *LogHelper) Fatalf(format string, a ...interface{}) {
 	_ = h.logger.Log(log.LevelFatal, h.msgKey, h.sprintf(format, a...))
 	os.Exit(1)
+}
+
+// Fatalf logs a message at fatal level.
+func (h *LogHelper) Output(calldepth int, s string) error {
+	_ = h.logger.Log(log.Level(calldepth-1), fmt.Sprintf("%s-nsq", h.msgKey), h.sprintf(s))
+	return nil
 }

@@ -2,6 +2,7 @@ package event
 
 import (
 	"context"
+	"github.com/2pgcn/gameim/api/protocol"
 	"github.com/segmentio/kafka-go"
 )
 
@@ -9,11 +10,10 @@ type EventHeader map[string]any
 
 type Event interface {
 	Header() EventHeader
-	Key() []byte
 	Value() []byte
-	RawValue() any
-	StartTrace(traceName string)
 	String() string
+	GetQueueMsg() *queueMsg
+	ToProtocol() (*protocol.Proto, error)
 }
 
 func NewHeader(size int) EventHeader {
@@ -31,7 +31,7 @@ func (eh EventHeader) GetKafkaHead() (res []kafka.Header) {
 	return res
 }
 
-type Handler func(context.Context, Event) error
+type Handler[T any] func(context.Context, Event) error
 
 type Sender interface {
 	Send(ctx context.Context, msg Event) error
@@ -39,7 +39,7 @@ type Sender interface {
 }
 
 type Receiver interface {
-	Receive(ctx context.Context) (e Event, err error)
+	Receive(ctx context.Context) (e []chan Event, err error)
 	Commit(ctx context.Context, event Event) error
 	Close() error
 }

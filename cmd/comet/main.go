@@ -2,57 +2,68 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"github.com/2pgcn/gameim/api/protocol"
 	"github.com/2pgcn/gameim/conf"
 	"github.com/2pgcn/gameim/internal/comet"
 	"github.com/2pgcn/gameim/pkg/gamelog"
+	"github.com/2pgcn/gameim/pkg/pprof"
+	"github.com/2pgcn/gameim/pkg/safe"
 	"github.com/2pgcn/gameim/pkg/trace_conf"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/grafana/pyroscope-go"
 	"github.com/spf13/cobra"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	_ "go.uber.org/automaxprocs"
-	"net/http"
+	"go.uber.org/zap/zapcore"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
-	"sync"
+	"strconv"
+)
+
+var (
+	Name    = "comet-0"
+	Version = "1.0.0"
 )
 
 var rootCmd = &cobra.Command{
 	Use:     "game im",
 	Short:   "game im comet",
 	Long:    `implementing game im comet in go`,
-	Version: "0.0.1",
+	Version: strconv.Itoa(int(protocol.Version)),
 	Run: func(cmd *cobra.Command, args []string) {
 		cometConfig := conf.InitCometConfig(CfgFile)
-		trace_conf.SetTraceConfig(cometConfig.TraceConf)
-		if port := os.Getenv("ILOGTAIL_PROFILE_PORT"); len(port) > 0 {
-			startPprof(fmt.Sprintf(":", port))
-		}
+		//todo add to conf
+		l := gamelog.GetZapLog(zapcore.DebugLevel, 2)
+		zlog := gamelog.NewHelper(l)
+		trace_conf.SetTraceConfig(cometConfig.UpData.TraceConf)
 		if err := startTrace(); err != nil {
 			panic(err)
 		}
+		if err := startPyroscope(Name, Version, cometConfig.UpData.Pyroscope.Address, gamelog.GetGlobalog()); err != nil {
+			panic(err)
 
-		wg := &sync.WaitGroup{}
+		}
 		ctx, cancel := context.WithCancel(context.Background())
-		l := gamelog.GetZapLog()
-		zlog := gamelog.NewHelper(l)
-		go func() {
-			zlog.Debug(http.ListenAndServe("0.0.0.0:8888", nil))
-		}()
-		s, err := comet.NewServer(ctx, cometConfig, wg, zlog)
+		gopool := safe.NewGoPool(ctx)
+
+		s, err := comet.NewServer(ctx, cometConfig, gopool, zlog)
 		if err != nil {
 			panic(err)
 		}
+
 		signals := make(chan os.Signal, 1)
 		signal.Notify(signals, os.Interrupt, os.Kill)
 		select {
 		case <-signals:
+			zlog.Debug("stop gameim comet")
 			cancel()
+			zlog.Debug("send ctx done success")
 			s.Close()
+			zlog.Debug("server closing")
+			gopool.Stop()
 		}
-		wg.Wait()
 	},
 }
 var CfgFile string
@@ -65,6 +76,7 @@ func main() {
 }
 
 func startTrace() error {
+	return nil
 	tp, err := trace_conf.GetTracerProvider()
 	if err != nil {
 		return err
@@ -74,8 +86,7 @@ func startTrace() error {
 	return nil
 }
 
-func startPprof(port string) {
-	go func() {
-		_ = http.ListenAndServe(port, nil)
-	}()
+func startPyroscope(appname, version, endpoint string, logger pyroscope.Logger) error {
+	return nil
+	return pprof.InitPyroscope(appname, version, endpoint, logger)
 }

@@ -1,0 +1,7 @@
+nsq:
+  topic: "gameim-comet-0"
+  channel: "gameim-comet-0"
+#  nsqd_address: ["192.168.31.49:31485"]
+#  lookupd: "192.168.31.49:31485"
+  lookupd: ":4150"
+  nsqd_address: [ ":4150" ]

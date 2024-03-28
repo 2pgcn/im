@@ -18,7 +18,7 @@ func InitCometConfig(CfgFile string) (cometConfig *CometConfig) {
 	if err := viper.ReadInConfig(); err != nil {
 		panic(err)
 	}
-	if err := viper.UnmarshalKey("Comet", &cometConfig); err != nil {
+	if err := viper.UnmarshalKey("comet", &cometConfig); err != nil {
 		panic(err)
 	}
 	return

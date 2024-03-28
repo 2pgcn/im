@@ -5,9 +5,9 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 )
 
-var _ propagation.TextMapCarrier = (*Msg)(nil)
+var _ propagation.TextMapCarrier = (*queueMsg)(nil)
 
-func (m *Msg) Get(key string) string {
+func (m *queueMsg) Get(key string) string {
 	gamelog.Debug("Msg TextMapCarrier: get", key)
 	if v, ok := m.H[key]; ok {
 		return v.(string)
@@ -15,12 +15,12 @@ func (m *Msg) Get(key string) string {
 	return ""
 }
 
-func (m *Msg) Set(key string, value string) {
+func (m *queueMsg) Set(key string, value string) {
 	gamelog.Debug("Msg TextMapCarrier: set", key, value)
 	m.H[key] = value
 }
 
-func (m *Msg) Keys() (res []string) {
+func (m *queueMsg) Keys() (res []string) {
 	e := m.Header()
 	for k, _ := range e {
 		res = append(res, k)
