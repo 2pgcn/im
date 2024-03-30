@@ -17,6 +17,7 @@ import (
 
 import (
 	_ "go.uber.org/automaxprocs"
+	_ "net/http/pprof"
 )
 
 // Injectors from wire.go:
@@ -29,7 +30,7 @@ func wireApp(confServer *conf.Server, confData *conf.Data, logger log.Logger) (*
 	}
 	authService := service.NewAuthService(logger, dataData)
 	grpcServer := server.NewGRPCServer(confServer, authService, logger)
-	otherServer := server.NewOtherServer()
+	otherServer := server.NewOtherServer(confServer)
 	app := newApp(logger, grpcServer, otherServer)
 	return app, func() {
 		cleanup()

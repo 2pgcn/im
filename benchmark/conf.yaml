@@ -5,3 +5,6 @@ nsq:
 #  lookupd: "192.168.31.49:31485"
   lookupd: "47.107.123.179:4150"
   nsqd_address: [ "47.107.123.179:4150" ]
+logic:
+  address: "discovery:///gameim-logic"
+  num: 100

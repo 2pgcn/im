@@ -67,7 +67,7 @@ func newApp(logger log.Logger, gs *grpc.Server, rs *server.OtherServer) *kratos.
 			rs,
 			gs,
 		),
-		//kratos.Registrar(reg),
+		kratos.Registrar(rs.R),
 	)
 }
 

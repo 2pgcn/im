@@ -8,7 +8,6 @@ import (
 	"github.com/go-kratos/kratos/v2/registry"
 	tracesdk "go.opentelemetry.io/otel/sdk/trace"
 	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
@@ -21,8 +20,8 @@ const (
 )
 
 type OtherServer struct {
-	tp *tracesdk.TracerProvider
-	r  registry.Registrar
+	Tp *tracesdk.TracerProvider
+	R  registry.Registrar
 }
 
 func (r *OtherServer) Start(ctx context.Context) error {
@@ -34,8 +33,10 @@ func (r *OtherServer) Stop(ctx context.Context) error {
 	return nil
 }
 
-func NewOtherServer() *OtherServer {
-	return &OtherServer{}
+func NewOtherServer(c *conf.Server) *OtherServer {
+	return &OtherServer{
+		R: RegisterK8s(c),
+	}
 }
 
 func RegisterK8s(c *conf.Server) registry.Registrar {
@@ -47,16 +48,7 @@ func RegisterK8s(c *conf.Server) registry.Registrar {
 }
 
 func getK8sClient(c *conf.Kubernetes) (client *kubernetes.Clientset, err error) {
-	var restConfig *rest.Config
-	if c.KubernetesClientType == conf.KubernetesClientType_INCluster {
-		restConfig, err = rest.InClusterConfig()
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		restConfig, err = clientcmd.BuildConfigFromFlags("", c.KubeConfigPath)
-
-	}
+	restConfig, err := clientcmd.BuildConfigFromFlags("", c.KubeConfigPath)
 	if err != nil {
 		return nil, err
 	}

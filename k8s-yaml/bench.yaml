@@ -29,17 +29,12 @@ spec:
       run: gameim-logic
   template:
     metadata:
-      labels:
-        run: gameim-logic
-        app: gameim-logic
-        kratos-service-app: "gameim-logic"
-        kratos-service-version: "1.0.0"
     spec:
       containers:
         - image: ${IMAGE}
-          name: gameim-logic
-          command: [ "/app/logic" ]
-          args: ["-conf","/app/conf/logic.yaml"]
+          name: gameim-bench
+          command: [ "/app/bench" ]
+          args: ["-conf","/app/conf/bench.yaml"]
           resources:
             requests:
               memory: "1024Mi"
@@ -50,11 +45,11 @@ spec:
           imagePullPolicy: Always
           volumeMounts:
             - name: gameim-logic-conf
-              mountPath: "/app/conf/l"
+              mountPath: "/app/conf/logic.yaml"
       volumes:
-        - name: gameim-logic-conf
+        - name: gameim-bench-conf
           configMap:
-            name: gameim-logic-conf
+            name: gameim-bench-conf
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler

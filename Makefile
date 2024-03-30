@@ -2,6 +2,7 @@ GOHOSTOS:=$(shell go env GOHOSTOS)
 BASEPATH=$(shell pwd)
 COMET=registry.cn-shenzhen.aliyuncs.com/pg/gameim
 LOGIC=registry.cn-shenzhen.aliyuncs.com/pg/gameim
+BENCH=registry.cn-shenzhen.aliyuncs.com/pg/game-bench
 #GAMEIMVERSION=$(shell cat version)
 GAMEIMVERSION=$(shell git describe --tags --always)
 
@@ -64,13 +65,17 @@ buildimage:
 	docker buildx build --platform linux/amd64 -f ./Dockerfile --push  -t registry.cn-shenzhen.aliyuncs.com/pg/gameim:$(GAMEIMVERSION) ./
 	#&& docker push  registry.cn-shenzhen.aliyuncs.com/pg/tcp_debug:$(TCP_DEBUG_VERSION)
 
+
 .PHONY: kcomet
 kcomet:
 	export IMAGE=$(COMET):$(GAMEIMVERSION) && envsubst < ./k8s-yaml/comet.yaml | kubectl apply -f -
 
 .PHONY: klogic
 klogic:
-	export IMAGE=$(LOGIC):$(GAMEIMVERSION) && envsubst < ./k8s-yaml/logic.yaml | kubectl apply -f -
+	export IMAGE=$(BENCH):$(GAMEIMVERSION) && envsubst < ./k8s-yaml/logic.yaml | kubectl apply -f -
+
+.PHONY: kbench
+	export IMAGE=$(BENCH):$(GAMEIMVERSION) && envsubst < ./k8s-yaml/bench.yaml | kubectl apply -f -
 
 .PHONY: delete
 delete:

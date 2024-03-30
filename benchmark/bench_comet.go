@@ -31,12 +31,12 @@ func benchComet(ctx context.Context, addr string, num int) {
 	log.Debug(num)
 	go result(ctx)
 	for i := begin; i < begin+num; i++ {
-		go client(ctx, addr, int64(i))
+		go clients(ctx, addr, int64(i))
 	}
 
 }
 
-func client(ctx context.Context, addr string, mid int64) {
+func clients(ctx context.Context, addr string, mid int64) {
 	for {
 		startClient(ctx, addr, mid)
 		time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
