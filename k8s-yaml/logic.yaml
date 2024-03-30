@@ -60,7 +60,7 @@ apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: comet-logic
-  namespace: pg
+  namespace: gameim
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
