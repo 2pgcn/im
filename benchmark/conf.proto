@@ -12,6 +12,10 @@ message Nsq{
   repeated string nsqd_address = 3;
   string lookupd = 4;
 }
+message Pyroscope{
+  string address = 1;
+}
 message BenchConf{
    Nsq nsq = 1;
+   Pyroscope pyroscope_address = 2;
 }

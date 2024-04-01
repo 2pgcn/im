@@ -8,3 +8,4 @@ nsq:
 logic:
   address: "discovery:///gameim-logic"
   num: 100
+pyroscope_address: "http://node1.2pg.cn:4040"

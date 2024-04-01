@@ -6,6 +6,7 @@ import (
 	"github.com/2pgcn/gameim/conf"
 	"github.com/2pgcn/gameim/pkg/event"
 	"github.com/2pgcn/gameim/pkg/gamelog"
+	"github.com/2pgcn/gameim/pkg/pprof"
 	"github.com/2pgcn/gameim/pkg/safe"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap/zapcore"
@@ -33,6 +34,8 @@ func main() {
 	cmd.PersistentFlags().StringVar(&address, "address", "", "address eg:127.0.0.1:9000")
 	cmd.PersistentFlags().IntVar(&num, "num", 1, "address eg:10")
 	c = getBenchConfig()
+	pprof.InitPyroscope("benchmark", "1.0.0", c.GetPyroscopeAddress().GetAddress(), gamelog.GetGlobalog())
+
 	exitChan := make(chan os.Signal, 1)
 	signal.Notify(exitChan, os.Kill, os.Interrupt)
 	err := cmd.Execute()

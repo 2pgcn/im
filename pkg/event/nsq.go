@@ -56,7 +56,7 @@ func NewNsqReceiver(c *conf.QueueMsg_Nsq) (r *NsqReceiver, err error) {
 	if err != nil {
 		return nil, err
 	}
-	consumer.ChangeMaxInFlight(2048)
+	consumer.ChangeMaxInFlight(10240)
 	r = &NsqReceiver{}
 	r.gopool = safe.NewGoPool(context.Background())
 
