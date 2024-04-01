@@ -1,4 +1,3 @@
 config
 
-logic.yaml
-comet.yaml
+*.yaml

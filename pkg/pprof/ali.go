@@ -31,7 +31,7 @@ func InitPyroscope(appName string, version string, endpoint string, log pyroscop
 		ServerAddress:   endpoint,
 		Logger:          log,
 		Tags:            map[string]string{"hostname": os.Getenv("HOSTNAME"), "environment": "test", "version": version},
-		UploadRate:      time.Second * 30,
+		UploadRate:      time.Second * 10,
 		ProfileTypes: []pyroscope.ProfileType{
 			pyroscope.ProfileCPU,
 			pyroscope.ProfileAllocObjects,

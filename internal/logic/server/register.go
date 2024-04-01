@@ -35,7 +35,7 @@ func (r *OtherServer) Stop(ctx context.Context) error {
 
 func NewOtherServer(c *conf.Server) *OtherServer {
 	return &OtherServer{
-		R: RegisterK8s(c),
+		//R: RegisterK8s(c),
 	}
 }
 
