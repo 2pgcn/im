@@ -44,7 +44,7 @@ func init() {
 }
 
 func initLog() log.Logger {
-	l := gamelog.GetZapLog(zapcore.InfoLevel, 2)
+	l := gamelog.GetZapLog(zapcore.DebugLevel, 2)
 	return gamelog.NewHelper(l)
 	//
 	//writeSyncer := zapcore.AddSync(os.Stdout)
@@ -100,17 +100,17 @@ func main() {
 		panic(err)
 	}
 
-	err := InitOther(bc.Server.TraceConf)
-	if err != nil {
-		panic(err)
-	}
+	//err := InitOther(bc.Server.TraceConf)
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	//todo 加配置里
-	err = startPyroscope(Name, Version, bc.Server.PyroscopeAddress, gamelog.GetGlobalog())
-	if err != nil {
-		panic(err)
-	}
-	trace_conf.SetTraceConfig(bc.Server.TraceConf)
+
+	//if err := startPyroscope(Name, Version, bc.Server.PyroscopeAddress, gamelog.GetGlobalog()); err != nil {
+	//	panic(err)
+	//}
+	//trace_conf.SetTraceConfig(bc.Server.TraceConf)
 	app, cleanup, err := wireApp(bc.Server, bc.Data, logger)
 	if err != nil {
 		panic(err)
@@ -123,6 +123,7 @@ func main() {
 }
 
 func startPyroscope(appname, version, endpoint string, logger pyroscope.Logger) error {
+	return nil
 	return pprof.InitPyroscope(appname, version, endpoint, logger)
 }
 

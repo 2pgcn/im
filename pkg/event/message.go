@@ -13,7 +13,7 @@ import (
 	"sync"
 )
 
-var queueMsgPool *safe.Pool[*queueMsg]
+var queueMsgPool *safe.Pool[*QueueMsg]
 var msgPool *safe.Pool[*protocol.Msg]
 var defaultPoolSize = 4096
 var once sync.Once
@@ -24,9 +24,9 @@ func init() {
 			return &protocol.Msg{}
 		})
 		msgPool.Grow(defaultPoolSize)
-		queueMsgPool = safe.NewPool(func() *queueMsg {
-			return &queueMsg{
-				H:    make(map[string]any, 8),
+		queueMsgPool = safe.NewPool(func() *QueueMsg {
+			return &QueueMsg{
+				H:    make(map[string]string, 8),
 				Data: msgPool.Get(),
 			}
 		})
@@ -34,16 +34,25 @@ func init() {
 	})
 }
 
-type queueMsg struct {
+type QueueMsg struct {
 	traceName string
+	id        string
 	H         EventHeader
 	Data      *protocol.Msg
 }
 
-func GetQueueMsg() *queueMsg {
+func (m *QueueMsg) GetId() string {
+	return m.H[eventId]
+}
+
+func (m *QueueMsg) SetId(id string) {
+	m.H[eventId] = id
+}
+
+func GetQueueMsg() *QueueMsg {
 	return queueMsgPool.Get()
 }
-func PutQueueMsg(m *queueMsg) {
+func PutQueueMsg(m *QueueMsg) {
 	if m.Data != nil {
 		msgPool.Put(m.Data)
 		m.Data = nil
@@ -58,17 +67,27 @@ func PutMsg(m *protocol.Msg) {
 	msgPool.Put(m)
 }
 
-func (m *queueMsg) StartTrace(traceName string) {
+func (m *QueueMsg) StartTrace(traceName string) {
 	m.traceName = traceName
 }
 
-func (m *queueMsg) Header() EventHeader {
-	return m.H
+func (m *QueueMsg) Header() *EventHeader {
+	return &m.H
 }
-func (m *queueMsg) GetQueueMsg() *queueMsg {
+func (m *QueueMsg) GetQueueMsg() *QueueMsg {
 	return m
 }
-func (m *queueMsg) ToProtocol() (p *protocol.Proto, err error) {
+
+func GetCloseMsg() *QueueMsg {
+	return &QueueMsg{H: map[string]string{"close": "true"}}
+}
+
+func (m *QueueMsg) IsClose() bool {
+	_, ok := m.H["close"]
+	return ok
+}
+
+func (m *QueueMsg) ToProtocol() (p *protocol.Proto, err error) {
 	p = protocol.ProtoPool.Get()
 	p.Version = protocol.Version
 	p.Op = m.Data.Type.ToOp()
@@ -83,22 +102,22 @@ func (m *queueMsg) ToProtocol() (p *protocol.Proto, err error) {
 	return
 }
 
-func (m *queueMsg) GetKafkaCommitMsg() (kmsg kafka.Message, err error) {
+func (m *QueueMsg) GetKafkaCommitMsg() (kmsg kafka.Message, err error) {
 	var (
 		partitionStrInt int64
 		offset          int64
 	)
-	partitionStrInt, err = strconv.ParseInt(m.Header()["partition"].(string), 10, 64)
+	partitionStrInt, err = strconv.ParseInt(m.H["partition"], 10, 64)
 	if err != nil {
 		return
 	}
-	offset, err = strconv.ParseInt(m.Header()["offset"].(string), 10, 64)
+	offset, err = strconv.ParseInt(m.H["offset"], 10, 64)
 	kmsg.Partition = int(partitionStrInt)
 	kmsg.Offset = offset
 	return kmsg, err
 }
 
-func (m *queueMsg) Value() (res []byte) {
+func (m *QueueMsg) Value() (res []byte) {
 	var err error
 	if res, err = json.Marshal(m); err != nil {
 		gamelog.Errorf("queue msg error:%+v", m)
@@ -107,6 +126,6 @@ func (m *queueMsg) Value() (res []byte) {
 	return res
 }
 
-func (m *queueMsg) String() string {
+func (m *QueueMsg) String() string {
 	return fmt.Sprintf("head:%+v,data:%+v", m.Header(), m.Data)
 }

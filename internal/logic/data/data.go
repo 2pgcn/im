@@ -13,12 +13,16 @@ import (
 // ProviderSet is data providers.
 var ProviderSet = wire.NewSet(NewData)
 
+var defaultMsgSize = 10240
+
 // Data .
 type Data struct {
 	redisClient *redis.Client
 	mysqlClient *gorm.DB
 	nsqClient   event.Sender
 	log         log.Logger
+	//解决queue client写入chan满了后会无限阻塞造成程序hang死问题
+	msgs chan event.Event
 }
 
 // NewData .
@@ -50,7 +54,7 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		//if err = sqlDb.Close(); err != nil {
 		//	log.NewHelper(logger).Errorf("closing the sqlDb client err:%v", err)
 		//}
-
+		log.NewHelper(logger).Infof("start cleanup")
 		if err = nsqClient.Close(); err != nil {
 			log.NewHelper(logger).Errorf("closing the nsq client err:%v", err)
 		}

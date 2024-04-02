@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"github.com/go-kratos/kratos/v2/config"
 	"github.com/go-kratos/kratos/v2/config/file"
 )
@@ -9,8 +8,6 @@ import (
 var flagconf string
 
 func getBenchConfig() *BenchConf {
-	flag.Parse()
-	flag.StringVar(&flagconf, "conf", "./conf.yaml", "config path, eg: -conf conf.yaml")
 	c := config.New(
 		config.WithSource(
 			file.NewSource(flagconf),

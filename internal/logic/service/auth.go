@@ -3,12 +3,9 @@ package service
 import (
 	"context"
 	pb "github.com/2pgcn/gameim/api/logic"
-	"github.com/2pgcn/gameim/conf"
 	"github.com/2pgcn/gameim/internal/logic/data"
 	"github.com/2pgcn/gameim/pkg/event"
 	"github.com/go-kratos/kratos/v2/log"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/trace"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
 	"math/rand"
 	"strconv"
@@ -43,8 +40,8 @@ func (s *AuthService) OnConnect(ctx context.Context, req *pb.ConnectReq) (*empty
 
 // todo 添加到kafka
 func (s *AuthService) OnMessage(ctx context.Context, req *pb.MessageReq) (*emptypb.Empty, error) {
-	ctx, span := otel.Tracer(conf.ServerName).Start(ctx, "OnMessageServices", trace.WithSpanKind(trace.SpanKindInternal))
-	defer span.End()
+	//ctx, span := otel.Tracer(conf.ServerName).Start(ctx, "OnMessageServices", trace.WithSpanKind(trace.SpanKindInternal))
+	//defer span.End()
 	data := event.GetQueueMsg()
 	data.Data.Type = req.Type
 	data.Data.ToId = req.ToId

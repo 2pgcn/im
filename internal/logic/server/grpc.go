@@ -6,23 +6,20 @@ import (
 	"github.com/2pgcn/gameim/internal/logic/service"
 	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/go-kratos/kratos/v2/log"
-	"github.com/go-kratos/kratos/v2/middleware/ratelimit"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
-	"github.com/go-kratos/kratos/v2/middleware/tracing"
 	"github.com/go-kratos/kratos/v2/transport/grpc"
-	"go.opentelemetry.io/otel"
 )
 
 // NewGRPCServer new a gRPC server.
 func NewGRPCServer(c *conf.Server, auth *service.AuthService, logger log.Logger) *grpc.Server {
 	var opts = []grpc.ServerOption{
 		grpc.Middleware(
-			tracing.Server(
-				tracing.WithTracerProvider(otel.GetTracerProvider()),
-				tracing.WithTracerName("gameim"),
-			),
+			//tracing.Server(
+			//	tracing.WithTracerProvider(otel.GetTracerProvider()),
+			//	tracing.WithTracerName("gameim"),
+			//),
 			recovery.Recovery(),
-			ratelimit.Server(),
+			//ratelimit.Server(),
 		),
 	}
 	gamelog.Debug("trace_conf grcp set TracerProvider export")

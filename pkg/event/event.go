@@ -6,13 +6,18 @@ import (
 	"github.com/segmentio/kafka-go"
 )
 
-type EventHeader map[string]any
+type EventHeader map[string]string
+
+const eventId = "ID"
 
 type Event interface {
-	Header() EventHeader
+	Header() *EventHeader
+	SetId(string)
+	GetId() string
 	Value() []byte
 	String() string
-	GetQueueMsg() *queueMsg
+	GetQueueMsg() *QueueMsg
+	IsClose() bool
 	ToProtocol() (*protocol.Proto, error)
 }
 
@@ -25,13 +30,13 @@ func (eh EventHeader) GetKafkaHead() (res []kafka.Header) {
 	for k, v := range eh {
 		res = append(res, kafka.Header{
 			Key:   k,
-			Value: []byte(v.(string)),
+			Value: ([]byte)(v),
 		})
 	}
 	return res
 }
 
-type Handler[T any] func(context.Context, Event) error
+type Handler func(context.Context, Event) error
 
 type Sender interface {
 	Send(ctx context.Context, msg Event) error

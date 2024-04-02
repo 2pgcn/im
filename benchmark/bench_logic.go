@@ -27,6 +27,17 @@ func benchLogic(ctx context.Context, address string, num int) {
 	var lasterr error
 	ticker := time.Tick(time.Second * 1)
 	gopool.GoCtx(func(ctx context.Context) {
+		t := time.Tick(time.Second * 3)
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-t:
+				fmt.Println(cc.GetState())
+			}
+		}
+	})
+	gopool.GoCtx(func(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
@@ -42,12 +53,14 @@ func benchLogic(ctx context.Context, address string, num int) {
 						Msg:      []byte("hello world"),
 					})
 					if err != nil {
-						lasterr = err
+						fmt.Println(cc.GetState())
+						fmt.Printf("lasterr:%s", err)
+						continue
 					}
 					addCountDown(1)
 				}
 				if lasterr != nil {
-					fmt.Printf("lasterr:%s", lasterr)
+
 				}
 			}
 		}

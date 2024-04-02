@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package conf;
+package main;
 
 option go_package = "github.com/2pgcn/main;main";
 import "google/protobuf/duration.proto";
@@ -17,5 +17,5 @@ message Pyroscope{
 }
 message BenchConf{
    Nsq nsq = 1;
-   Pyroscope pyroscope_address = 2;
+   Pyroscope pyroscope = 2;
 }

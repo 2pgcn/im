@@ -1,11 +1,12 @@
 nsq:
   topic: "gameim-comet-0"
   channel: "gameim-comet-0"
-#  nsqd_address: ["192.168.31.49:31485"]
+  nsqd_address: ["192.168.31.49:31485"]
 #  lookupd: "192.168.31.49:31485"
-  lookupd: "47.107.123.179:4150"
-  nsqd_address: [ "47.107.123.179:4150" ]
+#  lookupd: "47.107.123.179:4151"
+  #nsqd_address: [ "47.107.123.179:4150" ]
 logic:
   address: "discovery:///gameim-logic"
   num: 100
-pyroscope_address: "http://node1.2pg.cn:4040"
+pyroscope:
+  address: "http://node2.2pg.cn:4040"
