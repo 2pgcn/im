@@ -24,6 +24,7 @@ func NewChannel(size int) *Channel {
 
 }
 
+// Send todo 统一queue格式 类似nsq queue实现
 func (ch *Channel) Send(ctx context.Context, msg Event) error {
 	ch.ch[rand.Intn(ch.queueNum)] <- msg
 	return nil

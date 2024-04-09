@@ -133,7 +133,7 @@ func InitOther(traceConf *conf.TraceConf) error {
 	if err != nil {
 		return err
 	}
-	gamelog.Debug("trace_conf start TracerProvider and set global")
+	gamelog.GetGlobalog().Debug("trace_conf start TracerProvider and set global")
 	otel.SetTracerProvider(tp)
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}))
 	return nil

@@ -1,6 +1,7 @@
 //go:build ignore
 // +build ignore
 
+// todo 部分实现已更改,需要重构下
 package event
 
 import (
@@ -96,7 +97,7 @@ func (k *kafkaReceiver) Receive(ctx context.Context) (e Event, err error) {
 		H:    header,
 		Data: &msg,
 	}
-	gamelog.Debug(m.Headers, e.Header())
+	gamelog.GetGlobalog().Debug(m.Headers, e.Header())
 	ctxTra := otel.GetTextMapPropagator().Extract(context.Background(), e.(*Msg))
 	ctx, span := trace_conf.SetTrace(ctxTra, trace_conf.COMET_RECV_TO_QUEUE_MSG, trace.WithSpanKind(trace.SpanKindConsumer))
 	defer span.End()

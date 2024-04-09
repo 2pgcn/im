@@ -155,7 +155,21 @@ func (b *Bucket) broadcast(ev event.Event) {
 	defer b.lock.RUnlock()
 	c := ev.GetQueueMsg().Data
 	switch c.Type {
+	case protocol.Type_APP:
+		for _, v := range b.users {
+			err := v.Push(context.Background(), ev)
+			if err != nil {
+				b.GetLog().Errorf("room.Push error:%+v", ev)
+			}
+		}
 	case protocol.Type_ROOM:
+		if room := b.Room(roomId(c.ToId)); room != nil {
+			err := room.Push(b.ctx, ev)
+			if err != nil {
+				b.log.Errorf("room.Push error:%+v", ev)
+			}
+		}
+	case protocol.Type_CLOSE:
 		if room := b.Room(roomId(c.ToId)); room != nil {
 			err := room.Push(b.ctx, ev)
 			if err != nil {
@@ -166,7 +180,7 @@ func (b *Bucket) broadcast(ev event.Event) {
 		b.lock.RLock()
 		uid, err := strconv.ParseUint(c.ToId, 10, 64)
 		if err != nil {
-			gamelog.Error(err)
+			gamelog.GetGlobalog().Error(err)
 		}
 		user := b.users[userId(uid)]
 		b.lock.RUnlock()
@@ -176,6 +190,7 @@ func (b *Bucket) broadcast(ev event.Event) {
 				b.log.Errorf("room.Push error:%+v", ev)
 			}
 		}
+
 	}
 }
 

@@ -46,7 +46,7 @@ api:
 errors:
 	protoc --proto_path=./api/gerr \
 		   --proto_path=./third_party \
-		   --go_out=paths=source_relative:. \
+		   --go_out=paths=source_relative:./api/gerr \
 		   --go-errors_out=paths=source_relative:./api/gerr \
 		   $(ERROR_PROTO_FILES)
 # generate

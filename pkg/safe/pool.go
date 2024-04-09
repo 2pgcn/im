@@ -25,7 +25,7 @@ func (p *Pool[T]) Grow(n int) {
 	p.lastGropNum = n
 	for i := 0; i < n; i++ {
 		item := p.New()
-		p.Put(item)
+		p.List.PushBack(item)
 	}
 }
 

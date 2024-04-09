@@ -19,15 +19,16 @@ var defaultMsgSize = 10240
 type Data struct {
 	redisClient *redis.Client
 	mysqlClient *gorm.DB
-	nsqClient   event.Sender
-	log         log.Logger
+	//nsqClient   event.Sender
+	producer event.Sender
+	log      log.Logger
 	//解决queue client写入chan满了后会无限阻塞造成程序hang死问题
 	msgs chan event.Event
 }
 
 // NewData .
 func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
-	//redisClient, err := NewRedis(context.Background(), c.Redis)
+	//redisClient, err := event.NewRedisReceiver(c.RedisQueue)
 	//if err != nil {
 	//	panic(err)
 	//}
@@ -39,7 +40,11 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 	//if err != nil {
 	//	panic(err)
 	//}
-	nsqClient, err := event.NewNsqSender(c.GetNsq())
+	//nsqClient, err := event.NewNsqSender(c.GetNsq())
+	//if err != nil {
+	//	panic(err)
+	//}
+	sockClient, err := event.NewSockRender(c.Queue.Sock.Address)
 	if err != nil {
 		panic(err)
 	}
@@ -54,23 +59,27 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		//if err = sqlDb.Close(); err != nil {
 		//	log.NewHelper(logger).Errorf("closing the sqlDb client err:%v", err)
 		//}
-		log.NewHelper(logger).Infof("start cleanup")
-		if err = nsqClient.Close(); err != nil {
+
+		//log.NewHelper(logger).Infof("start cleanup")
+		//if err = nsqClient.Close(); err != nil {
+		//	log.NewHelper(logger).Errorf("closing the nsq client err:%v", err)
+		//}
+		if err = sockClient.Close(); err != nil {
 			log.NewHelper(logger).Errorf("closing the nsq client err:%v", err)
 		}
 	}
-	return &Data{nsqClient: nsqClient}, cleanup, nil
+	return &Data{producer: sockClient}, cleanup, nil
 }
 
-func NewRedis(ctx context.Context, data *conf.Data_Redis) (client *redis.Client, err error) {
+func NewRedis(ctx context.Context, data *conf.RedisQueue) (client *redis.Client, err error) {
 	client = redis.NewClient(&redis.Options{
-		Addr:         data.Addr,
-		Password:     "",              // no password set
-		DB:           int(data.UseDb), // use default DB
-		PoolSize:     int(data.PoolSize),
-		ReadTimeout:  data.ReadTimeout.AsDuration(),
-		WriteTimeout: data.WriteTimeout.AsDuration(),
+		Addr:         data.Rdscfg.Addr,
+		Password:     data.Rdscfg.GetPasswd(), // no password set
+		DB:           int(data.Rdscfg.UseDb),  // use default DB
+		PoolSize:     int(data.Rdscfg.PoolSize),
+		ReadTimeout:  data.Rdscfg.ReadTimeout.AsDuration(),
+		WriteTimeout: data.Rdscfg.WriteTimeout.AsDuration(),
 	})
-	client.Ping(ctx)
+	err = client.Ping(ctx).Err()
 	return
 }

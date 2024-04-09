@@ -4,6 +4,7 @@ import (
 	"container/heap"
 	"fmt"
 	"math/rand"
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -22,7 +23,7 @@ func TestHeartbeat(t *testing.T) {
 		randDuration := rand.Intn(runTmpNum)
 		t.Run(fmt.Sprintf("user-%d", i), func(t *testing.T) {
 			tmpTime := timeTest.Add(tmpDuration*1 + time.Nanosecond*time.Duration(randDuration))
-			heap.Push(hb, &Heartbeat{Id: i, Time: tmpTime, fn: func() {
+			heap.Push(hb, &HeapItem{Id: userId(strconv.Itoa(i)), Time: tmpTime, fn: func() {
 				atomic.AddInt32(&runNum, 1)
 			}})
 		})

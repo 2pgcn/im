@@ -9,7 +9,7 @@ import (
 
 const infiniteDuration = time.Duration(1<<63 - 1)
 
-// todo 增加对象池
+// HeartHeap todo 增加对象池
 // HeartHeap An IntHeap is a min-heap of ints.
 type HeartHeap struct {
 	sort.Interface
@@ -21,7 +21,7 @@ type HeartHeap struct {
 	look   sync.RWMutex
 }
 
-// Heartbeat min heap
+// HeapItem Heartbeat min heap
 type HeapItem struct {
 	Id userId //userId
 	//过期时间

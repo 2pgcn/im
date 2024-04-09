@@ -37,7 +37,7 @@ func NewApp(ctx context.Context, c *conf.AppConfig, receiver event.Receiver, l g
 		ctx:      ctx,
 		Appid:    c.Appid,
 		Buckets:  make([]*Bucket, c.BucketNum),
-		log:      l,
+		log:      l.AppendPrefix("app"),
 		receiver: receiver,
 		gopool:   gopool,
 	}
@@ -54,6 +54,7 @@ func (a *App) Start() error {
 		if err != nil {
 			a.GetLog().Errorf("app start queueHandle error:%s", err)
 		}
+		gamelog.GetGlobalog().Debug("app gopool is stop")
 	})
 	return nil
 }
@@ -76,6 +77,7 @@ func (a *App) queueHandle() (err error) {
 				case <-ctx.Done():
 					return
 				case m := <-q:
+					gamelog.GetGlobalog().Info(m)
 					msg := m.GetQueueMsg()
 					switch msg.Data.Type {
 					case protocol.Type_PUSH:

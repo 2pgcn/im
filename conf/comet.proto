@@ -4,47 +4,17 @@ package conf;
 
 option go_package = "github.com/2pgcn/gameim/conf;conf";
 import "google/protobuf/duration.proto";
+import "common.proto";
 
 
-enum QueueType{
-  KAFKA = 0;
-}
 message serverMsg{
   string name = 1;
   repeated string addrs = 2;
   int32 port = 3;
   uint32 max_connections = 4; //max conn nums
-  uint32 goroutines = 5; //go routines nums default is 0 means use cpu nums
+  queueMsg queue = 5;
 }
 
-message queueMsg{
-  string type = 1;
-  Redis redis = 2;
-  Nsq nsq = 3;
-  message Redis{
-    string addr = 1;
-    string password = 2;
-    int32 db = 3;
-  }
-  message sasl{
-    string username = 1;
-    string password = 2;
-    string instance_id = 3;
-  }
-  message Kafka{
-    string topic = 1;
-    sasl sasl = 2;
-    repeated string bootstrap_servers = 3;
-    string  consumer_group_id = 4;
-    int32 partition_num = 5;
-  }
-  message Nsq{
-    string topic = 1;
-    string channel = 2;
-    repeated string nsqd_address = 3;
-    repeated string lookupd = 4;
-  }
-}
 
 message sslMsg{
   bool enable = 1;
@@ -54,7 +24,7 @@ message sslMsg{
 message tcpMsg{
   uint64 send_buf =1;
   uint64 recv_buf = 2;
-  bool keepalive = 3;
+  google.protobuf.Duration keepalive_timeout = 3;
 }
 message logicClientGrpc{
   string addr = 1;
@@ -80,14 +50,4 @@ message UpData{
     Pyroscope pyroscope = 1;
     TraceConf trace_conf =2;
 }
-message Pyroscope{
-  string address = 1;
-}
 
-message TraceConf{
-  string slsProjectHeader = 1;
-  string slsInstanceIDHeader =2;
-  string slsAccessKeyIDHeader = 3;
-  string slsAccessKeySecretHeader = 4;
-  string endpoint = 5;
-}

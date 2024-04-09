@@ -12,10 +12,23 @@ message Nsq{
   repeated string nsqd_address = 3;
   string lookupd = 4;
 }
+
+
+message Redis{
+  string topic = 1;
+  string channel = 2;
+  string redis_address = 3;
+}
+
+message Sock{
+  string address = 1;
+}
 message Pyroscope{
   string address = 1;
 }
 message BenchConf{
    Nsq nsq = 1;
    Pyroscope pyroscope = 2;
+   Redis redis = 3;
+   Sock sock = 4;
 }

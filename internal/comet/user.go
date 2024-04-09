@@ -30,13 +30,12 @@ type User struct {
 }
 
 func NewUser(ctx context.Context, conn *net.TCPConn, log gamelog.GameLog) *User {
-	log = log.ReplacePrefix(gamelog.DefaultMessageKey + "user")
-	pool := safe.NewGoPool(ctx)
+	pool := safe.NewGoPool(ctx, "gameim-comet-user")
 	return &User{
 		ctx:      ctx,
 		msgQueue: event.NewChannel(128),
 		conn:     conn,
-		log:      log,
+		log:      log.AppendPrefix("user"),
 		pool:     pool,
 	}
 }
@@ -60,12 +59,14 @@ func (u *User) Start() {
 	chans := u.Pop(u.ctx)
 	for _, v1 := range chans {
 		v := v1
+		//todo,accept fin to exit
 		u.pool.GoCtx(func(ctx context.Context) {
 			for {
 				select {
 				case <-u.ctx.Done():
 					return
 				case msgEvent := <-v:
+					gamelog.GetGlobalog().Info(msgEvent)
 					writeProto, err := msgEvent.ToProtocol()
 					if err != nil {
 						u.log.Errorf("writeProto err: %+v", writeProto)
@@ -90,10 +91,8 @@ func (u *User) Start() {
 // Close the channel.
 func (u *User) Close() {
 	msg := event.GetQueueMsg()
-	u.log.Debug("start close u")
 	msg.Data.Type = protocol.Type_CLOSE
 	err := u.Push(context.Background(), msg)
-	u.log.Debug("start push u")
 	if err != nil {
 		u.log.Errorf("close u.push error %s", err.Error())
 	}

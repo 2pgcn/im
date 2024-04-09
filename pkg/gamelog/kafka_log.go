@@ -43,7 +43,7 @@ type KafkaErrorLog struct {
 
 func InitKafkaLog(l *LogHelper) {
 	one.Do(func() {
-		l = l.ReplacePrefix(DefaultMessageKey + "kafka").(*LogHelper)
+		l = l.AppendPrefix(DefaultMessageKey + "kafka").(*LogHelper)
 		globeKafkaLog = &KafkaLog{l: l, level: log.LevelDebug}
 		globeKafkaErrorLog = &KafkaLog{l: l, level: log.LevelError}
 	})

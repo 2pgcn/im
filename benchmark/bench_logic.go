@@ -6,6 +6,8 @@ import (
 	"github.com/2pgcn/gameim/api/client"
 	"github.com/2pgcn/gameim/api/logic"
 	"github.com/2pgcn/gameim/api/protocol"
+	"github.com/2pgcn/gameim/conf"
+	"github.com/2pgcn/gameim/pkg/event"
 	"os"
 	"os/signal"
 	"strconv"
@@ -13,36 +15,30 @@ import (
 )
 
 func benchLogic(ctx context.Context, address string, num int) {
-	kDis, err := client.NewK8sDiscovery("")
+	//kDis, err := client.NewK8sDiscovery("")
+	//if err != nil {
+	//	panic(err)
+	//}
+	err := StartTestSockRecv("../sock_queue.sock")
 	if err != nil {
 		panic(err)
 	}
+	time.Sleep(time.Second * 5)
 	ctx, cancel := context.WithCancel(context.Background())
 	//默认k8s注册
-	cc, err := client.NewGrpcClient(ctx, address, kDis)
+	cc, err := client.NewGrpcClient(ctx, address, nil)
 	if err != nil {
 		panic(err)
 	}
 	gclient := logic.NewLogicClient(cc)
 	var lasterr error
-	ticker := time.Tick(time.Second * 1)
-	gopool.GoCtx(func(ctx context.Context) {
-		t := time.Tick(time.Second * 3)
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-t:
-				fmt.Println(cc.GetState())
-			}
-		}
-	})
+
 	gopool.GoCtx(func(ctx context.Context) {
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-ticker:
+			default:
 				for i := 0; i < num; i++ {
 					addCountSend(1)
 					_, err := gclient.OnMessage(ctx, &logic.MessageReq{
@@ -81,4 +77,34 @@ func benchLogic(ctx context.Context, address string, num int) {
 			}
 		}
 	}()
+}
+
+// 模拟sock接收,方便压测logic
+func StartTestSockRecv(address string) error {
+	rcvQueue, err := event.NewSockReceiver(&conf.Sock{
+		Address: address,
+	})
+	if err != nil {
+		return err
+	}
+	e, err := rcvQueue.Receive(context.Background())
+	for _, v1 := range e {
+		v := v1
+		gopool.GoCtx(func(ctx context.Context) {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case _ = <-v:
+					//atomic.AddInt64(&countDown, 1)
+					//event.PutQueueMsg(msg.GetQueueMsg())
+					//err = consumer.Commit(ctx, msg)
+					//if err != nil {
+					//	fmt.Println(err)
+					//}
+				}
+			}
+		})
+	}
+	return nil
 }

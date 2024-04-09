@@ -8,7 +8,7 @@ import (
 var _ propagation.TextMapCarrier = (*QueueMsg)(nil)
 
 func (m *QueueMsg) Get(key string) string {
-	gamelog.Debug("Msg TextMapCarrier: get", key)
+	gamelog.GetGlobalog().Debug("Msg TextMapCarrier: get", key)
 	if v, ok := m.H[key]; ok {
 		return v
 	}
@@ -16,7 +16,7 @@ func (m *QueueMsg) Get(key string) string {
 }
 
 func (m *QueueMsg) Set(key string, value string) {
-	gamelog.Debug("Msg TextMapCarrier: set", key, value)
+	gamelog.GetGlobalog().Debug("Msg TextMapCarrier: set", key, value)
 	m.H[key] = value
 }
 

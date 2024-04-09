@@ -6,9 +6,7 @@ import (
 	"errors"
 	"github.com/2pgcn/gameim/pkg/safe"
 	"github.com/golang/protobuf/proto"
-	"io"
 	"math"
-	"net"
 	"sync"
 )
 
@@ -70,6 +68,8 @@ const (
 
 	OpDisconnect      = uint16(10)
 	OpDisconnectReply = uint16(11)
+
+	OpErrReply = uint16(12)
 )
 
 const maxPackSize = math.MaxUint32
@@ -143,12 +143,6 @@ func (p *Proto) writeTcp(writer *bufio.Writer) (err error) {
 }
 
 func (p *Proto) DecodeFromBytes(b *bufio.Reader) (err error) {
-	if _, err = b.Peek(HeaderLen); err != nil {
-		var opErr *net.OpError
-		if errors.Is(err, io.EOF) || errors.As(err, &opErr) || opErr.Timeout() {
-			return ErrEOFData
-		}
-	}
 	headBuf := headerPool.Get().([]byte)
 	defer headerPool.Put(headBuf)
 	if err = binary.Read(b, binary.BigEndian, &headBuf); err != nil {

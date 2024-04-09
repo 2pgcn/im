@@ -120,7 +120,7 @@ func (m *QueueMsg) GetKafkaCommitMsg() (kmsg kafka.Message, err error) {
 func (m *QueueMsg) Value() (res []byte) {
 	var err error
 	if res, err = json.Marshal(m); err != nil {
-		gamelog.Errorf("queue msg error:%+v", m)
+		gamelog.GetGlobalog().Errorf("queue msg error:%+v", m)
 		return []byte{}
 	}
 	return res

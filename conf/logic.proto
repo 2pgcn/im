@@ -4,7 +4,7 @@ package conf;
 option go_package = "github.com/2pgcn/gameim/conf;conf";
 
 import "google/protobuf/duration.proto";
-import "comet.proto";
+import "common.proto";
 
 enum DataType {
   ETCD = 0;
@@ -56,16 +56,6 @@ message Data {
     google.protobuf.Duration connection_max_lifetime = 5;
     string log_level = 6;
   }
-  message Redis {
-    string network = 1;
-    string addr = 2;
-    google.protobuf.Duration read_timeout = 3;
-    google.protobuf.Duration write_timeout = 4;
-    google.protobuf.Duration keep_live = 5;
-    int32 pool_size = 6;
-    int32 use_db = 7;
-  }
-
   message Sasl{
     string username = 1;
     string password = 2;
@@ -84,7 +74,9 @@ message Data {
     repeated string address = 3;
   }
   Mysql mysql = 1;
-  Redis redis = 2;
-  //Kafka kafka = 3;
-  Nsq nsq = 3;
+  queueMsg queue = 2;
+
+//  RedisQueue redis_queue = 2;
+//  Kafka kafka = 3;
+//  Nsq nsq = 3;
 }

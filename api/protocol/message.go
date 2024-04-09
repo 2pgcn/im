@@ -15,6 +15,11 @@ type Proto struct {
 	Data     []byte
 }
 
+func (p *Proto) SetErrReply(err error) {
+	p.Op = OpErrReply
+	p.Data = []byte(err.Error())
+}
+
 func (p *Proto) String() string {
 	var msg *Msg
 	_ = json.Unmarshal(p.Data, msg)
@@ -44,11 +49,3 @@ func (t Type) ToOp() uint16 {
 		return OpHeartbeatReply
 	}
 }
-
-//func MarshalErr(e *error2.Error) (res []byte) {
-//	//res, _ = proto.Marshal(&Msg{
-//	//	Code:    e.Code,
-//	//	Message: e.Message,
-//	//})
-//	return res
-//}

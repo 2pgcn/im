@@ -31,7 +31,7 @@ func BenchmarkTest(b *testing.B) {
 	}
 }
 
-func TestSerializeTo(t *testing.T) {
+func BenchmarkSerializeTo(b *testing.B) {
 	server, client := net.Pipe()
 	cliBuf := bufio.NewWriter(client)
 	serBuf := bufio.NewReader(server)
@@ -44,21 +44,26 @@ func TestSerializeTo(t *testing.T) {
 		SendId: "1",
 		Msg:    []byte("hello world gameim"),
 	})
+
 	step := make(chan bool)
 	hsProto := ProtoPool.Get()
 	go func() {
-		err := hcProto.writeTcp(cliBuf)
-		if err != nil {
-			t.Error(err)
+		for i := 0; i < b.N; i++ {
+			err := hcProto.writeTcp(cliBuf)
+			if err != nil {
+				b.Error(err)
+			}
 		}
 	}()
 	go func() {
-		err := hsProto.DecodeFromBytes(serBuf)
-		if err != nil {
-			t.Error(err)
-		}
-		if hcProto.Op != hsProto.Op || hcProto.Seq != hsProto.Seq || len(hcProto.Data) != len(hsProto.Data) {
-			t.Errorf("client write(%v):server read error,data(%v)", hcProto, hsProto)
+		for i := 0; i < b.N; i++ {
+			err := hsProto.DecodeFromBytes(serBuf)
+			if err != nil {
+				b.Error(err)
+			}
+			if hcProto.Op != hsProto.Op || hcProto.Seq != hsProto.Seq || len(hcProto.Data) != len(hsProto.Data) {
+				b.Errorf("client write(%v):server read error,data(%v)", hcProto, hsProto)
+			}
 		}
 		step <- true
 	}()

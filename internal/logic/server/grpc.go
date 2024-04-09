@@ -4,10 +4,21 @@ import (
 	v1 "github.com/2pgcn/gameim/api/logic"
 	"github.com/2pgcn/gameim/conf"
 	"github.com/2pgcn/gameim/internal/logic/service"
-	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-kratos/kratos/v2/middleware/recovery"
 	"github.com/go-kratos/kratos/v2/transport/grpc"
+	grpc2 "google.golang.org/grpc"
+	"time"
+)
+
+const (
+	// grpc options
+	grpcInitialWindowSize     = 1 << 24
+	grpcInitialConnWindowSize = 1 << 24
+	grpcMaxSendMsgSize        = 1 << 24
+	grpcMaxCallMsgSize        = 1 << 24
+	grpcKeepAliveTime         = time.Second * 10
+	grpcKeepAliveTimeout      = time.Second * 3
 )
 
 // NewGRPCServer new a gRPC server.
@@ -21,8 +32,14 @@ func NewGRPCServer(c *conf.Server, auth *service.AuthService, logger log.Logger)
 			recovery.Recovery(),
 			//ratelimit.Server(),
 		),
+
+		grpc.Options(
+			//	maxReceiveMessageSize int
+			//maxSendMessageSize    int
+			grpc2.MaxRecvMsgSize(grpcMaxCallMsgSize),
+			grpc2.MaxSendMsgSize(grpcMaxSendMsgSize),
+		),
 	}
-	gamelog.Debug("trace_conf grcp set TracerProvider export")
 	if c.Grpc.Network != "" {
 		opts = append(opts, grpc.Network(c.Grpc.Network))
 	}

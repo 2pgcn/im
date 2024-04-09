@@ -57,9 +57,11 @@ func startClient(ctx context.Context, addr string, key int64) {
 	wr := bufio.NewWriter(conn)
 	rd := bufio.NewReader(conn)
 
-	authToken := atomic.LoadInt64(&aliveCount)
-	p := protocol.ProtoPool.Get()
-	defer protocol.ProtoPool.Put(p)
+	uid := atomic.LoadInt64(&aliveCount)
+	authToken := uid
+	//p := protocol.ProtoPool.Get()
+	//defer protocol.ProtoPool.Put(p)
+	p := new(protocol.Proto)
 	p.Version = 1
 	p.Op = protocol.OpAuth
 	p.Seq = seq
@@ -84,17 +86,14 @@ func startClient(ctx context.Context, addr string, key int64) {
 		log.Errorf("auth proto.Unmarshal() error(%v)", err)
 	}
 	addAliveCount(1)
-	//测试 1000000用户在一个区
-	//go func() {
-	//hbProto := protocol.ProtoPool.Get()
-	//for {
+
 	// heartbeat
 	hbProto := &protocol.Proto{}
 	hbProto.Op = protocol.OpSendAreaMsg
 	hbProto.Seq = seq
 	hbProto.Data, _ = proto.Marshal(&protocol.Msg{
-		Type:   protocol.Type_ROOM,
-		ToId:   userInfo.RoomId,
+		Type:   protocol.Type_PUSH,
+		ToId:   strconv.FormatInt(uid, 10),
 		SendId: userInfo.Uid,
 		Msg:    []byte("hello world gameim"),
 	})
@@ -105,7 +104,6 @@ func startClient(ctx context.Context, addr string, key int64) {
 				return
 			}
 			addCountSend(1)
-			time.Sleep(time.Second * 1)
 		}
 	}()
 	//log.Infof("key:%d send msg %+v", key, hbProto)

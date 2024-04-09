@@ -58,3 +58,15 @@ func IsAuthAppidError(err error) bool {
 func ErrorAuthAppidError(format string, args ...interface{}) *errors.Error {
 	return errors.New(500, TypeStatusCode_AUTH_APPID_ERROR.String(), fmt.Sprintf(format, args...))
 }
+
+func IsMsgFormatError(err error) bool {
+	if err == nil {
+		return false
+	}
+	e := errors.FromError(err)
+	return e.Reason == TypeStatusCode_MSG_FORMAT_ERROR.String() && e.Code == 500
+}
+
+func ErrorMsgFormatError(format string, args ...interface{}) *errors.Error {
+	return errors.New(500, TypeStatusCode_MSG_FORMAT_ERROR.String(), fmt.Sprintf(format, args...))
+}

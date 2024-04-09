@@ -16,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	_ "go.uber.org/automaxprocs"
 	"go.uber.org/zap/zapcore"
+	"net/http"
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
@@ -33,6 +34,9 @@ var rootCmd = &cobra.Command{
 	Long:    `implementing game im comet in go`,
 	Version: strconv.Itoa(int(protocol.Version)),
 	Run: func(cmd *cobra.Command, args []string) {
+		go func() {
+			_ = http.ListenAndServe("0.0.0.0:9990", nil)
+		}()
 		cometConfig := conf.InitCometConfig(CfgFile)
 		//todo add to conf
 		l := gamelog.GetZapLog(zapcore.InfoLevel, 2)
@@ -41,12 +45,12 @@ var rootCmd = &cobra.Command{
 		if err := startTrace(); err != nil {
 			panic(err)
 		}
-		if err := startPyroscope(Name, Version, cometConfig.UpData.Pyroscope.Address, gamelog.GetGlobalog()); err != nil {
-			panic(err)
-
-		}
+		//if err := startPyroscope(Name, Version, cometConfig.UpData.Pyroscope.Address, gamelog.GetGlobalog()); err != nil {
+		//	panic(err)
+		//
+		//}
 		ctx, cancel := context.WithCancel(context.Background())
-		gopool := safe.NewGoPool(ctx)
+		gopool := safe.NewGoPool(ctx, "gameim-comet-main")
 
 		s, err := comet.NewServer(ctx, cometConfig, gopool, zlog)
 		if err != nil {

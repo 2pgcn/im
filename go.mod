@@ -12,7 +12,7 @@ require (
 	github.com/grafana/pyroscope-go v1.1.1
 	github.com/nsqio/go-nsq v1.1.0
 	github.com/pkg/errors v0.9.1
-	github.com/redis/go-redis/v9 v9.3.0
+	github.com/redis/go-redis/v9 v9.5.1
 	github.com/segmentio/kafka-go v0.4.44
 	github.com/spf13/cobra v1.7.0
 	github.com/spf13/viper v1.18.2

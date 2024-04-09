@@ -29,7 +29,7 @@ func result(ctx context.Context) {
 	var (
 		lastDown int64
 		lastSend int64
-		interval = int64(1)
+		interval = int64(3)
 	)
 	for {
 		select {

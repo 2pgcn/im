@@ -5,6 +5,7 @@ import (
 	"github.com/2pgcn/gameim/conf"
 	"github.com/go-kratos/kratos/v2/log"
 	"os"
+	"runtime"
 )
 
 // DefaultMessageKey default message key.
@@ -13,7 +14,7 @@ var DefaultMessageKey = conf.ServerName
 type GameLog interface {
 	log.Logger
 	LogPrint
-	ReplacePrefix(s string) GameLog
+	AppendPrefix(s string) GameLog
 	NsqLog
 }
 
@@ -59,9 +60,9 @@ func NewHelper(logger log.Logger) *LogHelper {
 	return options
 }
 
-func (h *LogHelper) ReplacePrefix(s string) GameLog {
+func (h *LogHelper) AppendPrefix(s string) GameLog {
 	return &LogHelper{
-		msgKey:  s,
+		msgKey:  fmt.Sprintf("%s:%s", h.msgKey, s),
 		logger:  h.logger,
 		sprint:  h.sprint,
 		sprintf: h.sprintf,
@@ -70,6 +71,11 @@ func (h *LogHelper) ReplacePrefix(s string) GameLog {
 
 // Log Print log by level and keyvals.
 func (h *LogHelper) Log(level log.Level, keyvals ...interface{}) error {
+	_, path, file, ok := runtime.Caller(1)
+	fmt.Println(path, file, ok)
+	if ok {
+		_ = h.logger.Log(level, "stack:", path, file)
+	}
 	_ = h.logger.Log(level, keyvals...)
 	return nil
 }

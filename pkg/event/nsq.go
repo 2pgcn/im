@@ -18,25 +18,14 @@ import (
 
 var FullError = fmt.Errorf("queue is full")
 
-var defaultQueueNum = 8
-var defaultQueueLen = 10240
-
+// NsqSender todo 增加连接池,查看源码后发现为单连接....
 type NsqSender struct {
 	ctx                context.Context
-	topic              string
 	q                  *nsq.Producer
+	topic              string
 	senderQueue        []*SendMsgChans
 	nsqAsyncReturnChan chan *nsq.ProducerTransaction
 	gopool             *safe.GoPool
-}
-
-type SendMsgChans struct {
-	chs chan Event
-	//todo,赞未存储,记录发送失败消息
-	msgs map[string]Event
-	//记录chs里有多少消息
-	lens int64
-	lock sync.RWMutex
 }
 
 // NewNsqSender todo 仅测试,produce与nsqd一对一,需要修改代码添加容错
@@ -45,7 +34,6 @@ func NewNsqSender(c *conf.Data_Nsq) (*NsqSender, error) {
 	//defaultQueueNum = runtime.NumCPU()
 	config := nsq.NewConfig()
 	config.MaxBackoffDuration = time.Second * 10
-	gamelog.GetGlobalog().Debug(config)
 	p, err := nsq.NewProducer(c.GetAddress()[0], config)
 	if err != nil {
 		return nil, err
@@ -54,10 +42,9 @@ func NewNsqSender(c *conf.Data_Nsq) (*NsqSender, error) {
 		return nil, err
 	}
 
-	p.SetLogger(gamelog.GetGlobalNsqLog(), nsq.LogLevelWarning)
+	p.SetLogger(gamelog.GetGlobalNsqLog(), nsq.LogLevelDebug)
 	var sendQueue []*SendMsgChans
-	gopool := safe.NewGoPool(context.Background())
-	gopool.SetName("NsqSender")
+	gopool := safe.NewGoPool(context.Background(), "NsqSender")
 	nsqAsyncReturnChan := make(chan *nsq.ProducerTransaction, defaultQueueLen/10)
 	for i := 0; i < defaultQueueNum; i++ {
 		sendQueue = append(sendQueue, &SendMsgChans{
@@ -77,11 +64,13 @@ func NewNsqSender(c *conf.Data_Nsq) (*NsqSender, error) {
 						gamelog.GetGlobalog().Debug("recv close msg,close")
 						return
 					}
+					atomic.AddInt64(&v.lens, -1)
 					err = p.PublishAsync(c.Topic, msg.Value(), nsqAsyncReturnChan, msg.GetId())
 					if err != nil {
 						gamelog.GetGlobalog().Errorf("send PublishAsync error:%s", err)
 						return
 					}
+
 					////有消息判断长度,最大为len(v.chs)/20
 					//maxLen := atomic.LoadInt64(&v.lens)
 					//benchMsgLen := defaultQueueLen / 10
@@ -109,17 +98,17 @@ func NewNsqSender(c *conf.Data_Nsq) (*NsqSender, error) {
 					//	}
 					//}
 
-				case res := <-nsqAsyncReturnChan:
-					if res.Error != nil {
-						gamelog.GetGlobalog().Error(res)
-					}
-					for _, vArg := range res.Args {
-						id := vArg.(string)
-						v.lock.Lock()
-						delete(v.msgs, id)
-						v.lock.Unlock()
-
-					}
+				case _ = <-nsqAsyncReturnChan:
+					//if res.Error != nil {
+					//	gamelog.GetGlobalog().Error(res)
+					//}
+					//for _, vArg := range res.Args {
+					//	id := vArg.(string)
+					//	v.lock.Lock()
+					//	delete(v.msgs, id)
+					//	v.lock.Unlock()
+					//
+					//}
 				}
 			}
 		})
@@ -155,10 +144,11 @@ func (s *NsqSender) Close() error {
 		v.chs <- GetCloseMsg()
 		close(v.chs)
 	}
+	gamelog.GetGlobalog().Infof("NsqSender.Close() s.q.Stop() start close")
 	s.q.Stop()
-	gamelog.GetGlobalog().Infof("nsq sender start close")
+	gamelog.GetGlobalog().Infof("NsqSender.Close() start close")
 	s.gopool.Stop()
-	gamelog.Infof("nsq sender is closed")
+	gamelog.GetGlobalog().Infof("NsqSender.Close() is closed")
 	return nil
 }
 
@@ -171,7 +161,7 @@ type NsqReceiver struct {
 	gopool    *safe.GoPool
 }
 
-func NewNsqReceiver(c *conf.QueueMsg_Nsq) (r *NsqReceiver, err error) {
+func NewNsqReceiver(c *conf.Nsq) (r *NsqReceiver, err error) {
 	consumerConfig := nsq.NewConfig()
 	consumer, err := nsq.NewConsumer(c.GetTopic(), c.GetChannel(), consumerConfig)
 	consumer.SetLogger(gamelog.GetGlobalNsqLog(), nsq.LogLevelWarning)
@@ -180,7 +170,7 @@ func NewNsqReceiver(c *conf.QueueMsg_Nsq) (r *NsqReceiver, err error) {
 	}
 	consumer.ChangeMaxInFlight(8096)
 	r = &NsqReceiver{}
-	r.gopool = safe.NewGoPool(context.Background())
+	r.gopool = safe.NewGoPool(context.Background(), "nsq-receiver")
 
 	r.msgHandel = &MessageHandler{
 		queueNum:      defaultQueueNum,
@@ -196,7 +186,6 @@ func NewNsqReceiver(c *conf.QueueMsg_Nsq) (r *NsqReceiver, err error) {
 	if len(c.GetLookupd()) > 0 {
 		err = consumer.ConnectToNSQLookupds(c.GetLookupd())
 		if err != nil {
-
 			return nil, err
 		}
 	} else {

@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package conf;
+
+option go_package = "github.com/2pgcn/gameim/conf;conf";
+import "google/protobuf/duration.proto";
+
+
+message queueMsg{
+  QueueType type = 1;
+  Queue queue = 2;
+  Redis redis = 3;
+  Nsq nsq = 4;
+  Kafka kafka = 5;
+  Sock sock = 6;
+}
+
+message Queue{
+    string topic =1;
+    string channel =2;
+    int32 recv_queue_len = 3;
+    int32 recv_queue_num = 4;
+    int32 send_queue_len = 5;
+    int32 send_queue_num = 6;
+}
+message Redis{
+  string addr = 1;
+  string passwd = 2;
+  google.protobuf.Duration read_timeout = 3;
+  google.protobuf.Duration write_timeout = 4;
+  google.protobuf.Duration keep_live = 5;
+  int32 pool_size = 6;
+  int32 use_db = 7;
+}
+
+message RedisQueue{
+  Redis rdscfg = 1;
+  Queue queue = 2;
+}
+
+enum QueueType{
+  KAFKA = 0;
+  NSQ = 1;
+  REDIS = 2;
+  //for local test
+  SOCK = 3;
+}
+
+message sasl{
+  string username = 1;
+  string password = 2;
+  string instance_id = 3;
+}
+message Kafka{
+  string topic = 1;
+  sasl sasl = 2;
+  repeated string bootstrap_servers = 3;
+  string  consumer_group_id = 4;
+  int32 partition_num = 5;
+}
+message Nsq{
+  string topic = 1;
+  string channel = 2;
+  repeated string nsqd_address = 3;
+  repeated string lookupd = 4;
+}
+message Sock{
+  string address = 1;
+}
+
+
+// 上报数据
+message Pyroscope{
+  string address = 1;
+}
+
+message TraceConf{
+  string slsProjectHeader = 1;
+  string slsInstanceIDHeader =2;
+  string slsAccessKeyIDHeader = 3;
+  string slsAccessKeySecretHeader = 4;
+  string endpoint = 5;
+}
