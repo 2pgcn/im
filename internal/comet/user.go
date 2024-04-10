@@ -66,7 +66,7 @@ func (u *User) Start() {
 				case <-u.ctx.Done():
 					return
 				case msgEvent := <-v:
-					gamelog.GetGlobalog().Info(msgEvent)
+					gamelog.GetGlobalog().Debugf("user recv msg:%v", msgEvent)
 					writeProto, err := msgEvent.ToProtocol()
 					if err != nil {
 						u.log.Errorf("writeProto err: %+v", writeProto)

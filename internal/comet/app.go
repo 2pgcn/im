@@ -7,7 +7,7 @@ import (
 	"github.com/2pgcn/gameim/pkg/event"
 	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/2pgcn/gameim/pkg/safe"
-	"math/rand"
+	"strconv"
 	"sync"
 )
 
@@ -28,7 +28,8 @@ func (a *App) GetLog() gamelog.GameLog {
 
 // todo 修改下hash
 func (a *App) GetBucketIndex(userid userId) int {
-	return rand.Intn(len(a.Buckets))
+	idx, _ := strconv.Atoi(string(userid))
+	return idx % len(a.Buckets)
 }
 
 // NewApp todo 暂时写死app 需要改为从存储中获取 config改成app config
@@ -54,7 +55,6 @@ func (a *App) Start() error {
 		if err != nil {
 			a.GetLog().Errorf("app start queueHandle error:%s", err)
 		}
-		gamelog.GetGlobalog().Debug("app gopool is stop")
 	})
 	return nil
 }
@@ -77,7 +77,6 @@ func (a *App) queueHandle() (err error) {
 				case <-ctx.Done():
 					return
 				case m := <-q:
-					gamelog.GetGlobalog().Info(m)
 					msg := m.GetQueueMsg()
 					switch msg.Data.Type {
 					case protocol.Type_PUSH:
@@ -88,7 +87,7 @@ func (a *App) queueHandle() (err error) {
 								a.GetLog().Errorf("user.Push error:%s", err.Error())
 							}
 						} else {
-							a.GetLog().Errorf("user not exist:%d", msg.Data.GetToId())
+							a.GetLog().Debugf("user not exist:%d", msg.Data.GetToId())
 						}
 					case protocol.Type_ROOM, protocol.Type_APP:
 						a.broadcast(m)

@@ -37,6 +37,7 @@ func NewSockRender(addr string) (Sender, error) {
 }
 
 func (r *SockRender) Send(ctx context.Context, msg Event) error {
+	//todo sendto 对应topic+appid
 	m := msg.Value()
 	data := make([]byte, defaultHeaderLen+len(m))
 	binary.BigEndian.PutUint32(data, uint32(len(m)))

@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"context"
 	"errors"
+	"github.com/2pgcn/gameim/api/client"
 	"github.com/2pgcn/gameim/api/gerr"
 	"github.com/2pgcn/gameim/api/logic"
 	"github.com/2pgcn/gameim/api/protocol"
@@ -11,15 +12,7 @@ import (
 	"github.com/2pgcn/gameim/pkg/event"
 	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/2pgcn/gameim/pkg/safe"
-	"github.com/go-kratos/kratos/v2/middleware/recovery"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/backoff"
-	"google.golang.org/grpc/keepalive"
 
-	//"google.golang.org/grpc"
-	//"google.golang.org/grpc/credentials/insecure"
-	//"google.golang.org/grpc/keepalive"
-	trgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	"net"
 	"sync"
 	"time"
@@ -63,8 +56,15 @@ func NewServer(ctx context.Context, c *conf.CometConfig, gopool *safe.GoPool, lo
 			return server, gerr.ErrorServerError("NewServer").WithMetadata(gerr.GetStack()).WithCause(err)
 		}
 		server.apps[v.Appid] = tmpApp
-		server.log.Debugf("appid is starting:%+v", v.Appid)
+		err = tmpApp.Start()
+		if err != nil {
+			err = nil
+			gamelog.GetGlobalog().Errorf("app(%s) start error:%s", v.Appid, err)
+			continue
+		}
+		server.log.Debugf("step1:appid is started:%+v", v.Appid)
 	}
+
 	server.logic = newLogicClient(ctx, c.LogicClientGrpc)
 	for _, v := range c.Server.Addrs {
 		addr := v
@@ -109,12 +109,12 @@ func (s *Server) bindConn(ctx context.Context, host string, c *conf.TcpMsg) {
 }
 
 func (s *Server) handleComet(ctx context.Context, conn *net.TCPConn, c *conf.TcpMsg) error {
-	defer func() {
-		err := conn.Close()
-		if err != nil {
-			s.GetLog().Error("conn close err:%s", err)
-		}
-	}()
+	//defer func() {
+	//	err := conn.Close()
+	//	if err != nil {
+	//		s.GetLog().Error("conn close err:%s", err)
+	//	}
+	//}()
 	if err := conn.SetReadBuffer(int(c.SendBuf)); err != nil {
 		return gerr.ErrorServerError("conn.SetReadBuffer err").WithCause(err).WithMetadata(gerr.GetStack())
 	}
@@ -165,7 +165,6 @@ func (s *Server) handleComet(ctx context.Context, conn *net.TCPConn, c *conf.Tcp
 	user.WriteBuf = bw
 	user.Uid = userId(authReply.Uid)
 	user.RoomId = roomId(authReply.RoomId)
-	s.log.Debugf("test appid %s", authReply.Appid)
 	bucket := app.GetBucket(user.Uid)
 	bucket.PutUser(user)
 	var writeProto *protocol.Proto
@@ -176,7 +175,6 @@ func (s *Server) handleComet(ctx context.Context, conn *net.TCPConn, c *conf.Tcp
 	//启动用户获取自己msg
 	s.gopool.GoCtx(func(ctx context.Context) {
 		user.Start()
-		gamelog.GetGlobalog().Debug("user.Start() exit")
 	})
 
 	//不断读消息
@@ -184,7 +182,8 @@ func (s *Server) handleComet(ctx context.Context, conn *net.TCPConn, c *conf.Tcp
 	for {
 		err = p.DecodeFromBytes(user.ReadBuf)
 		if err != nil {
-			return gerr.ErrorServerError("p.DecodeFromBytes error:%s", err).WithMetadata(gerr.GetStack())
+			gamelog.GetGlobalog().Debugf("client DecodeFromBytes error,%s", err)
+			return nil
 		}
 		//msgCtx, span := trace_conf.SetTrace(context.Background(), trace_conf.COMET_RECV_CIENT_MSG,
 		//	trace.WithSpanKind(trace.SpanKindInternal), trace.WithAttributes(
@@ -192,7 +191,7 @@ func (s *Server) handleComet(ctx context.Context, conn *net.TCPConn, c *conf.Tcp
 		//		attribute.String("data", string(p.Data)),
 		//	))
 		//span.End()
-		msgCtx, _ := context.WithTimeout(context.Background(), time.Second*3)
+		msgCtx, _ := context.WithTimeout(context.Background(), time.Second*10)
 		msgP := event.GetMsg()
 		err = msgP.Unmarshal(p.Data)
 		if err != nil {
@@ -201,6 +200,7 @@ func (s *Server) handleComet(ctx context.Context, conn *net.TCPConn, c *conf.Tcp
 			err1 := p.WriteTcp(user.WriteBuf)
 			return replyErr.WithCause(err1).WithMetadata(gerr.GetStack())
 		}
+		gamelog.GetGlobalog().Debugf("recv client msg:%v,:srcMsg:%v", msgP, p)
 		switch p.Op {
 		case protocol.OpHeartbeat:
 			// 更新最小堆
@@ -231,7 +231,7 @@ func (s *Server) handleComet(ctx context.Context, conn *net.TCPConn, c *conf.Tcp
 			req := &logic.MessageReq{
 				Type:     sendType,
 				SendId:   string(user.Uid),
-				ToId:     string(1), //p.Data
+				ToId:     msgP.ToId, //p.Data
 				Msg:      p.Data,
 				CometKey: s.Name,
 			}
@@ -255,45 +255,50 @@ const (
 )
 
 func newLogicClient(ctx context.Context, c *conf.LogicClientGrpc) logic.LogicClient {
+	cc, err := client.NewGrpcClient(ctx, c.Addr, nil)
+	if err != nil {
+		panic(err)
+	}
+	return logic.NewLogicClient(cc)
 	//provider, err := trace_conf.GetTracerProvider()
 	//if err != nil {
 	//	panic(err)
 	//}
-	conn, err := trgrpc.DialInsecure(
-		ctx,
-		trgrpc.WithEndpoint(c.Addr),
-		trgrpc.WithTimeout(time.Second*3),
-		trgrpc.WithMiddleware(
-			//tracing.Client(tracing.WithTracerProvider(provider), tracing.WithTracerName("gameim")),
-			recovery.Recovery(),
-			//circuitbreaker.Client(),
-		),
-		trgrpc.WithOptions(
-			grpc.WithInitialWindowSize(grpcInitialWindowSize),
-			grpc.WithInitialWindowSize(grpcInitialWindowSize),
-			grpc.WithInitialConnWindowSize(grpcInitialConnWindowSize),
-			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcMaxCallMsgSize)),
-			grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(grpcMaxSendMsgSize)),
-			grpc.WithKeepaliveParams(keepalive.ClientParameters{
-				Time:                grpcKeepAliveTime,
-				Timeout:             grpcKeepAliveTimeout,
-				PermitWithoutStream: true,
-			}),
-			grpc.WithConnectParams(grpc.ConnectParams{
-				Backoff: backoff.Config{
-					BaseDelay:  time.Microsecond * 100,
-					Multiplier: 1.6,
-					Jitter:     0.2,
-					MaxDelay:   3 * time.Second,
-				}}),
-		),
-		//grpc.WithTransportCredentials(insecure.NewCredentials()), //todo 安全验证
-	)
-	if err != nil {
-		panic(err)
-	}
-	gamelog.GetGlobalog().Debugf("start grpc client:%s", c.Addr)
-	return logic.NewLogicClient(conn)
+	//conn, err := trgrpc.DialInsecure(
+	//	ctx,
+	//	trgrpc.WithEndpoint(c.Addr),
+	//	trgrpc.WithTimeout(time.Second*10),
+	//	trgrpc.WithMiddleware(
+	//		//tracing.Client(tracing.WithTracerProvider(provider), tracing.WithTracerName("gameim")),
+	//		recovery.Recovery(),
+	//		//circuitbreaker.Client(),
+	//	),
+	//	trgrpc.WithOptions(
+	//		grpc.WithInitialWindowSize(grpcInitialWindowSize),
+	//		grpc.WithInitialWindowSize(grpcInitialWindowSize),
+	//		grpc.WithInitialConnWindowSize(grpcInitialConnWindowSize),
+	//		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcMaxCallMsgSize)),
+	//		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(grpcMaxSendMsgSize)),
+	//		grpc.WithKeepaliveParams(keepalive.ClientParameters{
+	//			Time:                grpcKeepAliveTime,
+	//			Timeout:             grpcKeepAliveTimeout,
+	//			PermitWithoutStream: true,
+	//		}),
+	//		grpc.WithConnectParams(grpc.ConnectParams{
+	//			Backoff: backoff.Config{
+	//				BaseDelay:  time.Second * 1,
+	//				Multiplier: 1.6,
+	//				Jitter:     0.2,
+	//				MaxDelay:   5 * time.Second,
+	//			}}),
+	//	),
+	//	//grpc.WithTransportCredentials(insecure.NewCredentials()), //todo 安全验证
+	//)
+	//if err != nil {
+	//	panic(err)
+	//}
+	//gamelog.GetGlobalog().Debugf("start grpc client:%s", c.Addr)
+
 }
 
 func (s *Server) Close() {

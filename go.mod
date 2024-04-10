@@ -5,7 +5,7 @@ go 1.21
 require (
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/go-kratos/kratos/contrib/registry/kubernetes/v2 v2.0.0-20231113102135-421dbc7dae0f
-	github.com/go-kratos/kratos/v2 v2.7.1
+	github.com/go-kratos/kratos/v2 v2.7.3
 	github.com/go-sql-driver/mysql v1.7.1
 	github.com/golang/protobuf v1.5.3
 	github.com/google/wire v0.5.0

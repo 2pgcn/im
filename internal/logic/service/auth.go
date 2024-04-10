@@ -47,8 +47,8 @@ func (s *AuthService) OnMessage(ctx context.Context, req *pb.MessageReq) (*empty
 	data.Data.ToId = req.ToId
 	data.Data.SendId = req.SendId
 	data.Data.Msg = req.Msg
-
-	err := s.user.WriteNsqMessage(ctx, data)
+	//todo,根据userid 获取appid,->sendto/topic+appid
+	err := s.user.WriteMessage(ctx, data)
 	return &emptypb.Empty{}, err
 }
 

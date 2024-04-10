@@ -89,7 +89,7 @@ func startClient(ctx context.Context, addr string, key int64) {
 
 	// heartbeat
 	hbProto := &protocol.Proto{}
-	hbProto.Op = protocol.OpSendAreaMsg
+	hbProto.Op = protocol.OpSendMsg
 	hbProto.Seq = seq
 	hbProto.Data, _ = proto.Marshal(&protocol.Msg{
 		Type:   protocol.Type_PUSH,
@@ -114,9 +114,7 @@ func startClient(ctx context.Context, addr string, key int64) {
 			return
 		default:
 			if err = p.DecodeFromBytes(rd); err == nil {
-				atomic.AddInt64(&countDown, 1)
 				addCountDown(1)
-				log.Infof("key:%v. p: %s", key, string(p.Data))
 			}
 		}
 	}

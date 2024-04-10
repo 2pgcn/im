@@ -7,6 +7,8 @@ import (
 	"github.com/go-kratos/kratos/v2/registry"
 	trgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/backoff"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"time"
 )
@@ -31,6 +33,7 @@ func NewGrpcClient(ctx context.Context, addr string, d registry.Discovery, optio
 			circuitbreaker.Client(),
 		),
 		trgrpc.WithOptions(
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithInitialWindowSize(grpcInitialWindowSize),
 			grpc.WithInitialConnWindowSize(grpcInitialConnWindowSize),
 			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcMaxCallMsgSize)),
@@ -40,6 +43,13 @@ func NewGrpcClient(ctx context.Context, addr string, d registry.Discovery, optio
 				Timeout:             grpcKeepAliveTimeout,
 				PermitWithoutStream: true,
 			}),
+			grpc.WithConnectParams(grpc.ConnectParams{
+				Backoff: backoff.Config{
+					BaseDelay:  time.Second * 1,
+					Multiplier: 1.6,
+					Jitter:     0.2,
+					MaxDelay:   5 * time.Second,
+				}}),
 		),
 	}
 	if d != nil {
