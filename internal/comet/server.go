@@ -88,6 +88,10 @@ func (s *Server) bindConn(ctx context.Context, host string, c *conf.TcpMsg) {
 		return
 	}
 	s.listens = append(s.listens, listener)
+	//var conn *net.TCPConn
+	//var err error
+	//raddr := net.UnixAddr{Name: "", Net: "unix"}
+	//listenUnix, err := net.ListenUnix("unix", &raddr)
 	for {
 		conn, err = listener.AcceptTCP()
 		if err != nil {
