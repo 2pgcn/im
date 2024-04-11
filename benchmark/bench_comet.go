@@ -12,6 +12,7 @@ import (
 	"flag"
 	"github.com/2pgcn/gameim/api/logic"
 	"github.com/2pgcn/gameim/api/protocol"
+	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 	"math/rand"
@@ -45,6 +46,8 @@ func clients(ctx context.Context, addr string, mid int64) {
 }
 
 func startClient(ctx context.Context, addr string, key int64) {
+	gamelog.GetGlobalog().Info(key)
+
 	//time.Sleep(time.Duration(rand.Intn(120)) * time.Second)
 	atomic.AddInt64(&aliveCount, 1)
 	defer atomic.AddInt64(&aliveCount, -1)
@@ -107,7 +110,6 @@ func startClient(ctx context.Context, addr string, key int64) {
 
 	go func() {
 		for {
-			time.Sleep(time.Second * 1)
 			if err = hbProto.WriteTcp(wr); err != nil {
 				log.Errorf("key:%d tcpWriteProto() error(%v)", key, err)
 				return
@@ -122,9 +124,10 @@ func startClient(ctx context.Context, addr string, key int64) {
 		case <-ctx.Done():
 			return
 		default:
-			if err = p.DecodeFromBytes(rd); err == nil {
-				addCountDown(1)
+			if err = p.DecodeFromBytes(rd); err != nil {
+				gamelog.GetGlobalog().Error(err)
 			}
+			addCountDown(1)
 		}
 	}
 }

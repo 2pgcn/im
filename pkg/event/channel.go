@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-var queueChannelNum = 1
+var queueChannelNum = 12
 
 // todo 抽象出来为了方便后续链路追踪信息注入
 type Channel struct {
@@ -16,9 +16,13 @@ type Channel struct {
 }
 
 func NewChannel(size int) *Channel {
+	chs := make([]chan Event, queueChannelNum)
+	for i := 0; i < queueChannelNum; i++ {
+		chs[i] = make(chan Event, size)
+	}
 	return &Channel{
 		queueNum: queueChannelNum,
-		ch:       []chan Event{make(chan Event, size)},
+		ch:       chs,
 		one:      sync.Once{},
 	}
 
@@ -34,8 +38,7 @@ func (ch *Channel) Send(ctx context.Context, msg Event) error {
 func (ch *Channel) Close() error {
 	ch.one.Do(func() {
 		for _, v := range ch.ch {
-			v1 := v
-			close(v1)
+			close(v)
 		}
 	})
 	return nil

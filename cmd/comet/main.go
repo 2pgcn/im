@@ -6,7 +6,7 @@ import (
 	"github.com/2pgcn/gameim/conf"
 	"github.com/2pgcn/gameim/internal/comet"
 	"github.com/2pgcn/gameim/pkg/gamelog"
-	"github.com/2pgcn/gameim/pkg/pprof"
+	pp "github.com/2pgcn/gameim/pkg/pprof"
 	"github.com/2pgcn/gameim/pkg/safe"
 	"github.com/2pgcn/gameim/pkg/trace_conf"
 	"github.com/go-kratos/kratos/v2/log"
@@ -19,6 +19,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime/pprof"
 	"strconv"
 )
 
@@ -41,6 +42,7 @@ var rootCmd = &cobra.Command{
 		//	panic(err)
 		//
 		//}
+
 		cometConfig := conf.InitCometConfig(CfgFile)
 		//todo add to conf
 		l := gamelog.GetZapLog(zapcore.InfoLevel, 2)
@@ -86,5 +88,17 @@ func startTrace() error {
 }
 
 func startPyroscope(appname, version, endpoint string, logger pyroscope.Logger) error {
-	return pprof.InitPyroscope(appname, version, endpoint, logger)
+	return pp.InitPyroscope(appname, version, endpoint, logger)
+}
+
+func startPprof() {
+	cf, err := os.Create("/tmp/gameim-comet-0.cpu")
+	if err != nil {
+		panic(err)
+	}
+	defer func() {
+		pprof.StopCPUProfile()
+		cf.Close()
+	}()
+	pprof.StartCPUProfile(cf)
 }

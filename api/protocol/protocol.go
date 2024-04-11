@@ -138,9 +138,27 @@ func (p *Proto) writeTcp(writer *bufio.Writer) (err error) {
 	binary.BigEndian.PutUint16(b[opSizeOffset:seqSizeOffset], p.Seq)
 	copy(b[seqSizeOffset:], p.Data)
 	if err = binary.Write(writer, binary.BigEndian, b); err != nil {
-		return
+		return errors.Join(errors.New("writer error"), err)
 	}
 	return writer.Flush()
+}
+
+func (p *Proto) WriteTcpNotFlush(writer *bufio.Writer) (err error) {
+	b := make([]byte, HeaderLen+len(p.Data))
+	if len(b) < HeaderLen {
+		return ErrInvalidBuffer
+	}
+	binary.BigEndian.PutUint32(b[0:packSizeOffset], uint32(len(p.Data)+HeaderLen))
+	binary.BigEndian.PutUint16(b[packSizeOffset:headerSizeOffset], HeaderLen)
+	binary.BigEndian.PutUint16(b[headerSizeOffset:versionSizeOffset], p.Version)
+	binary.BigEndian.PutUint16(b[versionSizeOffset:checksumSizeOffset], p.Checksum)
+	binary.BigEndian.PutUint16(b[checksumSizeOffset:opSizeOffset], p.Op)
+	binary.BigEndian.PutUint16(b[opSizeOffset:seqSizeOffset], p.Seq)
+	copy(b[seqSizeOffset:], p.Data)
+	if err = binary.Write(writer, binary.BigEndian, b); err != nil {
+		return errors.Join(errors.New("writer error"), err)
+	}
+	return
 }
 
 func (p *Proto) DecodeFromBytes(b *bufio.Reader) (err error) {

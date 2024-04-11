@@ -208,6 +208,7 @@ func (a *App) AddUser(token string, conn *net.TCPConn, br *bufio.Reader, bw *buf
 				if p.Op == protocol.OpSendMsg {
 					sendType = protocol.Type_PUSH
 				}
+				atomic.AddInt64(&a.logicMsgs[rand.Intn(defaultLogicLens)].len, 1)
 				a.logicMsgs[rand.Intn(defaultLogicLens)].msgReq <- &protocol.Msg{
 					Type:   sendType,
 					ToId:   msgP.ToId,

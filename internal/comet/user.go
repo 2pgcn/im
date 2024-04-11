@@ -10,32 +10,34 @@ import (
 	"github.com/2pgcn/gameim/pkg/safe"
 	"net"
 	"sync"
+	"sync/atomic"
 )
 
 type userId string
 
 type User struct {
-	ctx      context.Context
-	log      gamelog.GameLog
-	Uid      userId
-	Room     *Room
-	Next     *User
-	Prev     *User
-	AppId    string
-	RoomId   roomId
-	lock     sync.RWMutex
-	msgQueue *event.Channel
-	ReadBuf  *bufio.Reader
-	WriteBuf *bufio.Writer
-	conn     *net.TCPConn
-	pool     *safe.GoPool
+	ctx         context.Context
+	log         gamelog.GameLog
+	Uid         userId
+	Room        *Room
+	Next        *User
+	Prev        *User
+	AppId       string
+	RoomId      roomId
+	lock        sync.RWMutex
+	ReadBuf     *bufio.Reader
+	WriteBuf    *bufio.Writer
+	conn        *net.TCPConn
+	pool        *safe.GoPool
+	msgQueueLen int64
+	msgQueue    chan event.Event
 }
 
 func NewUser(ctx context.Context, conn *net.TCPConn, log gamelog.GameLog) *User {
 	pool := safe.NewGoPool(ctx, "gameim-comet-user")
 	return &User{
 		ctx:      ctx,
-		msgQueue: event.NewChannel(128),
+		msgQueue: make(chan event.Event, 128),
 		conn:     conn,
 		log:      log.AppendPrefix("user"),
 		pool:     pool,
@@ -43,46 +45,55 @@ func NewUser(ctx context.Context, conn *net.TCPConn, log gamelog.GameLog) *User 
 }
 
 func (u *User) Push(ctx context.Context, m event.Event) (err error) {
-	return u.msgQueue.Send(ctx, m)
+	u.msgQueue <- m
+	atomic.AddInt64(&u.msgQueueLen, 1)
+	return nil
 }
 
-func (u *User) Pop(ctx context.Context) (res []chan event.Event) {
-	res, _ = u.msgQueue.Receive(ctx)
-	return
+func (u *User) Pops(ctx context.Context) chan event.Event {
+
+	return u.msgQueue
 
 }
 
 func (u *User) Start() {
-	chans := u.Pop(u.ctx)
-	for _, v1 := range chans {
-		v := v1
-		//todo,accept fin to exit
-		u.pool.GoCtx(func(ctx context.Context) {
-			for {
-				select {
-				case <-u.ctx.Done():
-					return
-				case msgEvent := <-v:
-					gamelog.GetGlobalog().Info(msgEvent)
-					writeProto, err := msgEvent.ToProtocol()
+	//todo,accept fin to exit
+	u.pool.GoCtx(func(ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case msgEvent := <-u.Pops(ctx):
+				msgEvents := []event.Event{msgEvent}
+				l := atomic.LoadInt64(&u.msgQueueLen)
+				for i := 0; i < int(l); i++ {
+					msgEvents = append(msgEvents, <-u.Pops(ctx))
+				}
+				atomic.AddInt64(&u.msgQueueLen, int64(len(msgEvents))*-1)
+
+				for _, v := range msgEvents {
+					writeProto, err := v.ToProtocol()
 					if err != nil {
-						u.log.Info("writeProto err: %+v,%+v", writeProto, msgEvent)
+						u.log.Info("writeProto err: %+v,%+v", writeProto, v)
 						continue
 					}
-					if err = writeProto.WriteTcp(u.WriteBuf); err != nil {
+					if err = writeProto.WriteTcpNotFlush(u.WriteBuf); err != nil {
 						u.log.Infof("writeProto.EncodeTo(user.WriteBuf) error(%v)", err)
 						continue
 					}
-					if msgEvent.GetQueueMsg().Data.Type == protocol.Type_CLOSE {
+					if v.GetQueueMsg().Data.Type == protocol.Type_CLOSE {
 						//close
-						event.PutQueueMsg(msgEvent.GetQueueMsg())
-						u.log.Infof("recv msg close:%v", msgEvent.GetQueueMsg())
+						event.PutQueueMsg(v.GetQueueMsg())
+						u.log.Infof("recv msg close:%v", v.GetQueueMsg())
+						u.WriteBuf.Flush()
 						return
 					}
 				}
+				u.WriteBuf.Flush()
+
 			}
-		})
-	}
+		}
+	})
 }
 
 // Close the channel.
