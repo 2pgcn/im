@@ -40,14 +40,14 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 	//if err != nil {
 	//	panic(err)
 	//}
-	//nsqClient, err := event.NewNsqSender(c.GetNsq())
-	//if err != nil {
-	//	panic(err)
-	//}
-	sockClient, err := event.NewSockRender(c.Queue.Sock.Address)
+	nsqClient, err := event.NewNsqSender(c.Queue.Nsq)
 	if err != nil {
 		panic(err)
 	}
+	//sockClient, err := event.NewSockRender(c.Queue.Sock.Address)
+	//if err != nil {
+	//	panic(err)
+	//}
 	cleanup := func() {
 		//if err := redisClient.Close(); err != nil {
 		//	log.NewHelper(logger).Errorf("closing the redis client err:%v", err)
@@ -61,14 +61,14 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		//}
 
 		//log.NewHelper(logger).Infof("start cleanup")
-		//if err = nsqClient.Close(); err != nil {
-		//	log.NewHelper(logger).Errorf("closing the nsq client err:%v", err)
-		//}
-		if err = sockClient.Close(); err != nil {
+		if err = nsqClient.Close(); err != nil {
 			log.NewHelper(logger).Errorf("closing the nsq client err:%v", err)
 		}
+		//if err = sockClient.Close(); err != nil {
+		//	log.NewHelper(logger).Errorf("closing the nsq client err:%v", err)
+		//}
 	}
-	return &Data{producer: sockClient}, cleanup, nil
+	return &Data{producer: nsqClient}, cleanup, nil
 }
 
 func NewRedis(ctx context.Context, data *conf.RedisQueue) (client *redis.Client, err error) {

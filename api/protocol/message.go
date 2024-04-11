@@ -1,7 +1,6 @@
 package protocol
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 )
@@ -14,6 +13,10 @@ type Proto struct {
 	Seq      uint16
 	Data     []byte
 }
+type Auth struct {
+	Appid string `json:"appid"`
+	Token string `json:"token"`
+}
 
 func (p *Proto) SetErrReply(err error) {
 	p.Op = OpErrReply
@@ -21,9 +24,7 @@ func (p *Proto) SetErrReply(err error) {
 }
 
 func (p *Proto) String() string {
-	var msg *Msg
-	_ = json.Unmarshal(p.Data, msg)
-	return fmt.Sprintf("version:%d,op:%d,checksum:%d,seq:%d,data:%+v", p.Version, p.Op, p.Checksum, p.Seq, msg)
+	return fmt.Sprintf("version:%d,op:%d,checksum:%d,seq:%d,data:%+v", p.Version, p.Op, p.Checksum, p.Seq, string(p.Data))
 }
 
 //data=comet->logic->queue->comet
@@ -45,6 +46,8 @@ func (t Type) ToOp() uint16 {
 		return OpSendMsgRoomReply
 	case Type_PUSH:
 		return OpSendMsgReply
+	case Type_ACK:
+		return OpAck
 	default:
 		return OpHeartbeatReply
 	}

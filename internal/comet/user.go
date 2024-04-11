@@ -69,11 +69,11 @@ func (u *User) Start() {
 					gamelog.GetGlobalog().Debugf("user recv msg:%v", msgEvent)
 					writeProto, err := msgEvent.ToProtocol()
 					if err != nil {
-						u.log.Errorf("writeProto err: %+v", writeProto)
+						u.log.Errorf("writeProto err: %+v,%+v", writeProto, msgEvent)
 						continue
 					}
 					if err = writeProto.WriteTcp(u.WriteBuf); err != nil {
-						u.log.Errorf("writeProto.EncodeTo(user.WriteBuf) error(%v)", err)
+						u.log.Debugf("writeProto.EncodeTo(user.WriteBuf) error(%v)", err)
 						continue
 					}
 					if msgEvent.GetQueueMsg().Data.Type == protocol.Type_CLOSE {

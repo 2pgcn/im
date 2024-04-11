@@ -25,10 +25,10 @@ func benchNsq(ctx context.Context) {
 	if err != nil {
 		panic(err)
 	}
-	producer, err := event.NewNsqSender(&conf.Data_Nsq{
-		Topic:   c.GetNsq().GetTopic(),
-		Channel: c.GetNsq().GetChannel(),
-		Address: c.GetNsq().GetNsqdAddress(),
+	producer, err := event.NewNsqSender(&conf.Nsq{
+		Topic:       c.GetNsq().GetTopic(),
+		Channel:     c.GetNsq().GetChannel(),
+		NsqdAddress: c.GetNsq().GetNsqdAddress(),
 	})
 	if err != nil {
 		panic(err)
@@ -54,7 +54,7 @@ func benchNsq(ctx context.Context) {
 	var msgId = 0
 	gopool.GoCtx(func(ctx context.Context) {
 		for {
-			for i := 0; i <= 100; i++ {
+			for i := 0; i <= 1000; i++ {
 				queueMsg := &event.QueueMsg{
 					H:    make(map[string]string, 8),
 					Data: &protocol.Msg{},
@@ -84,7 +84,7 @@ func benchNsq(ctx context.Context) {
 					atomic.AddInt64(&countSend, 1)
 				}
 			}
-			time.Sleep(time.Second * 1)
+			time.Sleep(time.Millisecond * 30)
 		}
 	})
 	gopool.GoCtx(func(ctx context.Context) {

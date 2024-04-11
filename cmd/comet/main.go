@@ -41,10 +41,10 @@ var rootCmd = &cobra.Command{
 		//todo add to conf
 		l := gamelog.GetZapLog(zapcore.InfoLevel, 2)
 		zlog := gamelog.NewHelper(l)
-		trace_conf.SetTraceConfig(cometConfig.UpData.TraceConf)
-		if err := startTrace(); err != nil {
-			panic(err)
-		}
+		//trace_conf.SetTraceConfig(cometConfig.UpData.TraceConf)
+		//if err := startTrace(); err != nil {
+		//	panic(err)
+		//}
 		//if err := startPyroscope(Name, Version, cometConfig.UpData.Pyroscope.Address, gamelog.GetGlobalog()); err != nil {
 		//	panic(err)
 		//

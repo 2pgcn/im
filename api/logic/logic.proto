@@ -9,7 +9,7 @@ import "protocol/queue.proto";
 service Logic {
   rpc OnAuth(AuthReq) returns (AuthReply) {}
   rpc OnConnect(ConnectReq) returns (google.protobuf.Empty) {}
-  rpc OnMessage(MessageReq) returns (google.protobuf.Empty) {}
+  rpc OnMessage(stream MessageReq) returns (MessageReply) {}
   rpc OnClose(CloseReq) returns (google.protobuf.Empty) {}
 }
 
@@ -33,7 +33,16 @@ message MessageReq{
   string comet_key = 2;
   string to_id = 3;
   string send_id = 4;
-  bytes msg = 5;
+  string msg_id = 5;
+  bytes msg = 6;
+}
+message MessageReply{
+  repeated MsgReply msgs = 1;
+}
+
+message MsgReply{
+  string send_id = 1;
+  string msg_id = 2;
 }
 
 message CloseReq{

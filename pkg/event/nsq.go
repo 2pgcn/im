@@ -29,12 +29,12 @@ type NsqSender struct {
 }
 
 // NewNsqSender todo 仅测试,produce与nsqd一对一,需要修改代码添加容错
-func NewNsqSender(c *conf.Data_Nsq) (*NsqSender, error) {
+func NewNsqSender(c *conf.Nsq) (*NsqSender, error) {
 	//todo 添加到配置中
 	//defaultQueueNum = runtime.NumCPU()
 	config := nsq.NewConfig()
 	config.MaxBackoffDuration = time.Second * 10
-	p, err := nsq.NewProducer(c.GetAddress()[0], config)
+	p, err := nsq.NewProducer(c.GetNsqdAddress()[0], config)
 	if err != nil {
 		return nil, err
 	}

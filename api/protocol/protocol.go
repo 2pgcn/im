@@ -70,6 +70,7 @@ const (
 	OpDisconnectReply = uint16(11)
 
 	OpErrReply = uint16(12)
+	OpAck      = uint16(13)
 )
 
 const maxPackSize = math.MaxUint32

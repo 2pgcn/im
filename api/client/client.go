@@ -19,20 +19,26 @@ const (
 	grpcInitialConnWindowSize = 1 << 24
 	grpcMaxSendMsgSize        = 1 << 24
 	grpcMaxCallMsgSize        = 1 << 24
-	grpcKeepAliveTime         = time.Second * 10
-	grpcKeepAliveTimeout      = time.Second * 3
+	grpcKeepAliveTime         = time.Second * 60
+	grpcKeepAliveTimeout      = time.Second * 30
 )
 
 // NewGrpcClient todo 连接池 默认单连接qps10万以内,超过后可多次注册d增加连接池连接
 func NewGrpcClient(ctx context.Context, addr string, d registry.Discovery, options ...trgrpc.ClientOption) (*grpc.ClientConn, error) {
+	//provider, err := trace_conf.GetTracerProvider()
+	//if err != nil {
+	//	panic(err)
+	//}
 	ops := []trgrpc.ClientOption{
 		trgrpc.WithEndpoint(addr),
 		trgrpc.WithTimeout(time.Second * 3),
 		trgrpc.WithMiddleware(
 			recovery.Recovery(),
 			circuitbreaker.Client(),
+			//tracing.Client(tracing.WithTracerProvider(provider)),
 		),
 		trgrpc.WithOptions(
+			grpc.WithBlock(),
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 			grpc.WithInitialWindowSize(grpcInitialWindowSize),
 			grpc.WithInitialConnWindowSize(grpcInitialConnWindowSize),

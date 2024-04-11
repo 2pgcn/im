@@ -39,6 +39,7 @@ api:
 	protoc --proto_path=./api \
 		   --proto_path=./third_party \
 		   --go_out=paths=source_relative:./api \
+		    --go-grpc_out=paths=source_relative:./api \
 		   --go-http_out=paths=source_relative:./api \
 		   $(API_PROTO_FILES)
 .PHONY: errors
@@ -56,7 +57,7 @@ generate:
 	go generate ./... -mod=vendor
 .PHONY: srv
 comet:
-	go run ./cmd/comet/... --conf=$(BASEPATH)/conf/
+	go run ./cmd/comet/... --conf=$(BASEPATH)/conf/comet.yaml
 .PHONY: logic
 logic:
 	go run ./cmd/logic/... -conf=$(BASEPATH)/conf/logic.yaml

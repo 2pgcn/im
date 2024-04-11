@@ -9,6 +9,7 @@ import (
 	"github.com/2pgcn/gameim/pkg/safe"
 	"github.com/golang/protobuf/proto"
 	"github.com/segmentio/kafka-go"
+	"math"
 	"strconv"
 	"sync"
 )
@@ -91,6 +92,11 @@ func (m *QueueMsg) ToProtocol() (p *protocol.Proto, err error) {
 	p = protocol.ProtoPool.Get()
 	p.Version = protocol.Version
 	p.Op = m.Data.Type.ToOp()
+	ack, err := strconv.ParseUint(m.GetId(), 10, 64)
+	if err != nil || ack > math.MaxUint16 {
+		return nil, gerr.ErrorMsgFormatError("ack error").WithCause(err)
+	}
+	p.Seq = uint16(ack)
 	reply, err := proto.Marshal(&protocol.Reply{
 		Code: 0,
 		Msg:  m.Data,

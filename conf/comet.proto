@@ -24,11 +24,11 @@ message sslMsg{
 message tcpMsg{
   uint64 send_buf =1;
   uint64 recv_buf = 2;
-  google.protobuf.Duration keepalive_timeout = 3;
 }
 message logicClientGrpc{
   string addr = 1;
   google.protobuf.Duration timeout = 2;
+  int32 client_num = 3;
 }
 message app_config{
   string appid = 1;
@@ -36,13 +36,14 @@ message app_config{
   string pwd = 2;
   //bucket 根据bucketNum哈希 减少app里存储的全区的锁力度
   int32 bucketNum = 3;
+  google.protobuf.Duration keepalive_timeout = 4;
+  logicClientGrpc logic_client_grpc = 5;
 }
 message CometConfig{
   serverMsg server = 1;
   queueMsg queue = 2;
   sslMsg ssl = 3;
   tcpMsg tcp = 4;
-  logicClientGrpc logic_client_grpc = 5;
   repeated app_config app_config = 6;
   UpData up_data = 7;
 }

@@ -33,6 +33,10 @@ func benchLogic(ctx context.Context, address string, num int) {
 			panic(err)
 		}
 		gclient := logic.NewLogicClient(cc)
+		stream, err := gclient.OnMessage(ctx)
+		if err != nil {
+			panic(err)
+		}
 		gopool.GoCtx(func(ctx context.Context) {
 			for {
 				select {
@@ -40,7 +44,7 @@ func benchLogic(ctx context.Context, address string, num int) {
 					return
 				default:
 					addCountSend(1)
-					_, err := gclient.OnMessage(ctx, &logic.MessageReq{
+					stream.Send(&logic.MessageReq{
 						Type:     protocol.Type_PUSH,
 						CometKey: "test",
 						ToId:     "1",

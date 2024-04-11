@@ -8,9 +8,11 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"flag"
 	"github.com/2pgcn/gameim/api/logic"
 	"github.com/2pgcn/gameim/api/protocol"
+	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 	"math/rand"
@@ -27,10 +29,10 @@ func benchComet(ctx context.Context, addr string, num int) {
 	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
 	log = zap.NewExample().Sugar()
-	begin := 0
-	log.Debug(num)
+	begin := 1
 	go result(ctx)
 	for i := begin; i < begin+num; i++ {
+		i = i
 		go clients(ctx, addr, int64(i))
 	}
 
@@ -57,16 +59,23 @@ func startClient(ctx context.Context, addr string, key int64) {
 	wr := bufio.NewWriter(conn)
 	rd := bufio.NewReader(conn)
 
-	uid := atomic.LoadInt64(&aliveCount)
-	authToken := uid
+	authToken := key
 	//p := protocol.ProtoPool.Get()
 	//defer protocol.ProtoPool.Put(p)
-	p := new(protocol.Proto)
+	p := &protocol.Proto{}
 	p.Version = 1
 	p.Op = protocol.OpAuth
 	p.Seq = seq
-	p.Data = []byte(strconv.Itoa(int(authToken)))
-	log.Infof("auth start")
+
+	data, err := json.Marshal(&protocol.Auth{
+		Appid: "app001",
+		Token: strconv.Itoa(int(authToken)),
+	})
+	if err != nil {
+		panic(err)
+	}
+	p.Data = data
+	log.Infof("auth start,p%v", p)
 	if err = p.WriteTcp(wr); err != nil {
 		log.Errorf("tcpWriteProto() error(%v)", err)
 		return
@@ -85,6 +94,7 @@ func startClient(ctx context.Context, addr string, key int64) {
 	if err != nil {
 		log.Errorf("auth proto.Unmarshal() error(%v)", err)
 	}
+	gamelog.GetGlobalog().Info(p)
 	addAliveCount(1)
 
 	// heartbeat
@@ -93,7 +103,7 @@ func startClient(ctx context.Context, addr string, key int64) {
 	hbProto.Seq = seq
 	hbProto.Data, _ = proto.Marshal(&protocol.Msg{
 		Type:   protocol.Type_PUSH,
-		ToId:   strconv.FormatInt(uid, 10),
+		ToId:   userInfo.Uid,
 		SendId: userInfo.Uid,
 		Msg:    []byte("hello world gameim"),
 	})

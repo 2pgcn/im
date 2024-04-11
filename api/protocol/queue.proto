@@ -10,6 +10,7 @@ enum Type {
   ROOM = 1;
   PUSH = 2;
   CLOSE = 3;
+  ACK=4;
 }
 
 //comet后续消息格式
