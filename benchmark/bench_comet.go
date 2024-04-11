@@ -12,7 +12,6 @@ import (
 	"flag"
 	"github.com/2pgcn/gameim/api/logic"
 	"github.com/2pgcn/gameim/api/protocol"
-	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 	"math/rand"
@@ -94,21 +93,21 @@ func startClient(ctx context.Context, addr string, key int64) {
 	if err != nil {
 		log.Errorf("auth proto.Unmarshal() error(%v)", err)
 	}
-	gamelog.GetGlobalog().Info(p)
 	addAliveCount(1)
-
 	// heartbeat
 	hbProto := &protocol.Proto{}
 	hbProto.Op = protocol.OpSendMsg
 	hbProto.Seq = seq
 	hbProto.Data, _ = proto.Marshal(&protocol.Msg{
-		Type:   protocol.Type_PUSH,
-		ToId:   userInfo.Uid,
-		SendId: userInfo.Uid,
-		Msg:    []byte("hello world gameim"),
+		Type: protocol.Type_PUSH,
+		ToId: strconv.Itoa(int(authToken)),
+		//SendId: userInfo.Uid,
+		Msg: []byte("hello world gameim"),
 	})
+
 	go func() {
 		for {
+			time.Sleep(time.Second * 1)
 			if err = hbProto.WriteTcp(wr); err != nil {
 				log.Errorf("key:%d tcpWriteProto() error(%v)", key, err)
 				return

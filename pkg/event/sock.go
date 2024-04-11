@@ -8,6 +8,7 @@ import (
 	"github.com/2pgcn/gameim/conf"
 	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/2pgcn/gameim/pkg/safe"
+	"math/rand"
 	"net"
 	"time"
 )
@@ -37,7 +38,7 @@ func NewSockRender(addr string) (Sender, error) {
 }
 
 func (r *SockRender) Send(ctx context.Context, msg Event) error {
-	//todo sendto 对应topic+appid
+	defer PutQueueMsg(msg.(*QueueMsg))
 	m := msg.Value()
 	data := make([]byte, defaultHeaderLen+len(m))
 	binary.BigEndian.PutUint32(data, uint32(len(m)))
@@ -80,7 +81,6 @@ func NewSockReceiver(con *conf.Sock) (*SockReceiver, error) {
 	}
 	gopool.GoCtx(func(ctx context.Context) {
 		//var conns []net.Conn
-		index := 0
 		for {
 			conn, err := listenUnix.AcceptUnix()
 			if err != nil {
@@ -94,6 +94,7 @@ func NewSockReceiver(con *conf.Sock) (*SockReceiver, error) {
 				for {
 					err := binary.Read(redBuf, binary.BigEndian, head[:])
 					if err != nil {
+						gamelog.GetGlobalog().Errorf("queue sock binary.Read error:%", err)
 						continue
 					}
 					packLen := binary.BigEndian.Uint32(head[:])
@@ -114,7 +115,7 @@ func NewSockReceiver(con *conf.Sock) (*SockReceiver, error) {
 						gamelog.GetGlobalog().Errorf("queue sock read error:%err", err)
 						continue
 					}
-					r.msgHandel.receiverQueue[index/defaultQueueNum] <- msg
+					r.msgHandel.receiverQueue[rand.Intn(defaultQueueNum)] <- msg
 				}
 			})
 		}

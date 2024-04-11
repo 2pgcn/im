@@ -16,9 +16,10 @@ enum Type {
 //comet后续消息格式
 message Msg{
   Type type = 1;
-  string to_id = 2;
-  string send_id = 3;
-  bytes msg = 4;
+  uint32 msgid = 2;
+  string to_id = 3;
+  string send_id = 4;
+  bytes msg = 5;
 }
 
 //reply回复消息

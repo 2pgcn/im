@@ -10,7 +10,6 @@ import (
 	"github.com/2pgcn/gameim/api/logic"
 	"github.com/2pgcn/gameim/api/protocol"
 	"github.com/2pgcn/gameim/conf"
-	"github.com/2pgcn/gameim/pkg/event"
 	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/2pgcn/gameim/pkg/safe"
 	"net"
@@ -43,14 +42,14 @@ func NewServer(ctx context.Context, c *conf.CometConfig, gopool *safe.GoPool, lo
 	}
 	server.log = log.AppendPrefix("server")
 	//todo 工厂模式适配多个队列
-	rcvQueue, err := event.NewNsqReceiver(c.Queue.GetNsq())
+
 	//rcvQueue, err := event.NewSockReceiver(c.Queue.GetSock())
 	if err != nil {
 		return server, gerr.ErrorServerError("NewServer").WithMetadata(gerr.GetStack()).WithCause(err)
 	}
 	//启动所有app,目前从配置里读,改成从数据中心取,可类似traefik config模式改成动态配置启动
 	for _, v := range c.GetAppConfig() {
-		tmpApp, err := NewApp(ctx, v, rcvQueue, log, server.gopool)
+		tmpApp, err := NewApp(ctx, v, c.Queue, log, server.gopool)
 		if err != nil {
 			return server, gerr.ErrorServerError("NewServer").WithMetadata(gerr.GetStack()).WithCause(err)
 		}
@@ -123,7 +122,6 @@ func (s *Server) handleComet(ctx context.Context, conn *net.TCPConn, c *conf.Tcp
 		protocol.ProtoPool.Put(p)
 	}()
 	err := p.DecodeFromBytes(br)
-	gamelog.GetGlobalog().Info(p)
 	if err != nil {
 		_ = conn.Close()
 		return gerr.ErrorServerError("protocol.DecodeFromBytes error(%s),userData", err).WithCause(err).WithMetadata(gerr.GetStack())

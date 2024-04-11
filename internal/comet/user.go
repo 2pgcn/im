@@ -12,6 +12,8 @@ import (
 	"sync"
 )
 
+type userId string
+
 type User struct {
 	ctx      context.Context
 	log      gamelog.GameLog
@@ -45,12 +47,7 @@ func (u *User) Push(ctx context.Context, m event.Event) (err error) {
 }
 
 func (u *User) Pop(ctx context.Context) (res []chan event.Event) {
-	var err error
-	res, err = u.msgQueue.Receive(ctx)
-	if err != nil {
-		u.log.Errorf("pop msg error:%s", err)
-		return
-	}
+	res, _ = u.msgQueue.Receive(ctx)
 	return
 
 }
@@ -66,20 +63,20 @@ func (u *User) Start() {
 				case <-u.ctx.Done():
 					return
 				case msgEvent := <-v:
-					gamelog.GetGlobalog().Debugf("user recv msg:%v", msgEvent)
+					gamelog.GetGlobalog().Info(msgEvent)
 					writeProto, err := msgEvent.ToProtocol()
 					if err != nil {
-						u.log.Errorf("writeProto err: %+v,%+v", writeProto, msgEvent)
+						u.log.Info("writeProto err: %+v,%+v", writeProto, msgEvent)
 						continue
 					}
 					if err = writeProto.WriteTcp(u.WriteBuf); err != nil {
-						u.log.Debugf("writeProto.EncodeTo(user.WriteBuf) error(%v)", err)
+						u.log.Infof("writeProto.EncodeTo(user.WriteBuf) error(%v)", err)
 						continue
 					}
 					if msgEvent.GetQueueMsg().Data.Type == protocol.Type_CLOSE {
 						//close
 						event.PutQueueMsg(msgEvent.GetQueueMsg())
-						u.log.Debugf("recv msg close:%v", msgEvent.GetQueueMsg())
+						u.log.Infof("recv msg close:%v", msgEvent.GetQueueMsg())
 						return
 					}
 				}

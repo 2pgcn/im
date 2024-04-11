@@ -6,13 +6,11 @@ import (
 	"github.com/2pgcn/gameim/api/protocol"
 	"github.com/2pgcn/gameim/pkg/event"
 	"github.com/2pgcn/gameim/pkg/gamelog"
-	"strconv"
 	"sync"
 	"time"
 )
 
 type roomId string
-type userId string
 
 type Bucket struct {
 	ctx           context.Context
@@ -178,14 +176,10 @@ func (b *Bucket) broadcast(ev event.Event) {
 		}
 	case protocol.Type_PUSH:
 		b.lock.RLock()
-		uid, err := strconv.ParseUint(c.ToId, 10, 64)
-		if err != nil {
-			gamelog.GetGlobalog().Error(err)
-		}
-		user := b.users[userId(uid)]
+		user := b.users[userId(c.ToId)]
 		b.lock.RUnlock()
 		if user != nil {
-			err = user.Push(user.ctx, ev)
+			err := user.Push(user.ctx, ev)
 			if err != nil {
 				b.log.Errorf("room.Push error:%+v", ev)
 			}

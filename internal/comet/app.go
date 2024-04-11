@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"context"
 	"github.com/2pgcn/gameim/api/gerr"
-	"github.com/2pgcn/gameim/api/logic"
 	"github.com/2pgcn/gameim/api/protocol"
 	"github.com/2pgcn/gameim/conf"
 	"github.com/2pgcn/gameim/pkg/event"
@@ -33,16 +32,15 @@ type App struct {
 	//len(logicMsgs)==len(logicClients)=defaultLogiLens
 	lenNums      int
 	logicMsgs    []*logicMsg
-	logicClients []logic.LogicClient
+	logicClients []LogicInterface
 }
 
 type logicMsg struct {
-	msgReq chan *logic.MessageReq
+	msgReq chan *protocol.Msg
 	len    int64
 }
 
 func (a *App) GetLog() gamelog.GameLog {
-	//todo set log prefix
 	return a.log
 }
 
@@ -53,14 +51,19 @@ func (a *App) GetBucketIndex(userid userId) int {
 }
 
 // NewApp todo 暂时写死app 需要改为从存储中获取 config改成app config
-func NewApp(ctx context.Context, c *conf.AppConfig, receiver event.Receiver, l gamelog.GameLog, gopool *safe.GoPool) (*App, error) {
+func NewApp(ctx context.Context, c *conf.AppConfig, cq *conf.QueueMsg, l gamelog.GameLog, gopool *safe.GoPool) (*App, error) {
+	//todo 抽象成接口,获取各种queue
+	rcvQueue, err := event.NewSockReceiver(cq.GetSock())
+	if err != nil {
+		return nil, gerr.ErrorServerError("new queue error").WithCause(err).WithMetadata(gerr.GetStack())
+	}
 	app := &App{
 		ctx:      ctx,
 		conf:     c,
 		Appid:    c.Appid,
 		Buckets:  make([]*Bucket, c.BucketNum),
 		log:      l.AppendPrefix("app"),
-		receiver: receiver,
+		receiver: rcvQueue,
 		gopool:   gopool,
 	}
 
@@ -69,10 +72,15 @@ func NewApp(ctx context.Context, c *conf.AppConfig, receiver event.Receiver, l g
 	}
 	for i := 0; i < defaultLogicLens; i++ {
 		app.logicMsgs = append(app.logicMsgs, &logicMsg{
-			msgReq: make(chan *logic.MessageReq, defaultMessageReqLens),
+			msgReq: make(chan *protocol.Msg, defaultMessageReqLens),
 			len:    0,
 		})
-		app.logicClients = append(app.logicClients, newLogicClient(ctx, c.LogicClientGrpc))
+		lc, err := NewLogicClientTest(ctx, cq.GetSock())
+		if err != nil {
+			return nil, gerr.ErrorServerError("new queue error").WithCause(err).WithMetadata(gerr.GetStack())
+		}
+		app.logicClients = append(app.logicClients, lc)
+		//app.logicClients = append(app.logicClients, newLogicClient(ctx, c.LogicClientGrpc))
 	}
 	return app, nil
 }
@@ -88,48 +96,35 @@ func (a *App) Start() error {
 	for i := 0; i < defaultLogicLens; i++ {
 		index := i
 		a.gopool.GoCtx(func(ctx context.Context) {
-			//等待grpc自动重连
 			for {
 				select {
 				case <-ctx.Done():
 					return
 					//一次发送1/3
 				case req := <-a.logicMsgs[index].msgReq:
-					stream, err := a.logicClients[index].OnMessage(ctx)
+					var reqs []event.Event
+					ctx, _ := context.WithTimeout(ctx, time.Second*3)
+					num := min(atomic.LoadInt64(&a.logicMsgs[index].len), int64(defaultMessageReqLens/8))
+					for i := 0; i < int(num+1); i++ {
+						evMsg := event.GetQueueMsg()
+						if i == 0 {
+							evMsg.Data = req
+							evMsg.SetId(strconv.Itoa(int(req.Msgid)))
+						} else {
+							v := <-a.logicMsgs[index].msgReq
+							evMsg.SetId(strconv.Itoa(int(v.Msgid)))
+							evMsg.Data = v
+						}
+						reqs = append(reqs, evMsg)
+					}
+					atomic.AddInt64(&a.logicMsgs[index].len, (num+1)*-1)
+					//由于异步,所有消息会回ack,固重试1次后丢弃
+					failReqs, err := a.logicClients[index].OnMessage(ctx, reqs)
 					if err != nil {
-						a.logicMsgs[index].msgReq <- req
-						a.GetLog().Errorf("stream :OnMessage init is error:%s", err)
+						gamelog.GetGlobalog().Errorf("bench send to logicClients err:%s", err)
 						err = nil
-						time.Sleep(time.Second * 1)
+						_, _ = a.logicClients[index].OnMessage(ctx, failReqs)
 					}
-					atomic.AddInt64(&a.logicMsgs[index].len, -1)
-					num := min((atomic.LoadInt64(&a.logicMsgs[index].len)), int64(defaultMessageReqLens/8))
-					//todo 与for合并代码
-					err = stream.Send(req)
-					if err != nil {
-						a.GetLog().Errorf("ListStr get stream err: %v", err)
-						continue
-					}
-					for i := 0; i < int(num); i++ {
-						err = stream.Send(req)
-						if err != nil {
-							a.GetLog().Errorf("ListStr get stream err: %v", err)
-							continue
-						}
-						//失败暂不重新入队,成功则会收到ack并发送给客户端
-					}
-					resp, err := stream.CloseAndRecv()
-					for _, v := range resp.Msgs {
-						msg := event.GetQueueMsg()
-						msg.Data.Type = protocol.Type_ACK
-						msg.SetId(v.SendId)
-						user, ok := a.GetBucket(userId(v.SendId)).users[userId(v.SendId)]
-						if !ok {
-							continue
-						}
-						user.Push(ctx, msg)
-					}
-					time.Sleep(time.Millisecond * 50)
 				}
 			}
 		})
@@ -146,10 +141,7 @@ func (a *App) AddUser(token string, conn *net.TCPConn, br *bufio.Reader, bw *buf
 		}()
 		//todo 配置超时时间
 		grpcCtx, _ := context.WithTimeout(ctx, a.conf.LogicClientGrpc.Timeout.AsDuration())
-		authReply, err := a.logicClients[rand.Int63n(int64(a.conf.LogicClientGrpc.ClientNum))].OnAuth(grpcCtx, &logic.AuthReq{
-			Token: token,
-		})
-		gamelog.GetGlobalog().Info(authReply)
+		authReply, err := a.logicClients[rand.Int63n(int64(a.conf.LogicClientGrpc.ClientNum))].OnAuth(grpcCtx, token)
 
 		if err != nil {
 			gamelog.GetGlobalog().Errorf("req msg error%s", err)
@@ -195,7 +187,6 @@ func (a *App) AddUser(token string, conn *net.TCPConn, br *bufio.Reader, bw *buf
 				_ = p.WriteTcp(user.WriteBuf)
 				return
 			}
-			gamelog.GetGlobalog().Debugf("recv client msg:%v,:srcMsg:%v", msgP, p)
 			switch p.Op {
 			case protocol.OpHeartbeat:
 				// 更新最小堆
@@ -217,14 +208,21 @@ func (a *App) AddUser(token string, conn *net.TCPConn, br *bufio.Reader, bw *buf
 				if p.Op == protocol.OpSendMsg {
 					sendType = protocol.Type_PUSH
 				}
-				a.logicMsgs[a.GetBucketIndex(user.Uid)].msgReq <- &logic.MessageReq{
-					Type:     sendType,
-					SendId:   string(user.Uid),
-					MsgId:    strconv.Itoa(int(p.Seq)),
-					ToId:     msgP.ToId,
-					Msg:      p.Data,
-					CometKey: a.Appid,
+				a.logicMsgs[rand.Intn(defaultLogicLens)].msgReq <- &protocol.Msg{
+					Type:   sendType,
+					ToId:   msgP.ToId,
+					SendId: string(user.Uid),
+					Msgid:  uint32(p.Seq),
+					Msg:    p.Data,
 				}
+				//a.logicMsgs[a.GetBucketIndex(user.Uid)].msgReq <- &logic.MessageReq{
+				//	Type:     sendType,
+				//	SendId:   string(user.Uid),
+				//	MsgId:    strconv.Itoa(int(p.Seq)),
+				//	ToId:     msgP.ToId,
+				//	Msg:      p.Data,
+				//	CometKey: a.Appid,
+				//}
 			}
 		}
 	})
@@ -258,7 +256,7 @@ func (a *App) queueHandle() (err error) {
 								a.GetLog().Errorf("user.Push error:%s", err.Error())
 							}
 						} else {
-							a.GetLog().Debugf("user not exist:%d", msg.Data.GetToId())
+							a.GetLog().Infof("user not exist:%d", msg.Data.GetToId())
 						}
 					case protocol.Type_ROOM, protocol.Type_APP:
 						a.broadcast(m)
@@ -298,3 +296,31 @@ func (a *App) Close() {
 	a.GetLog().Debug("app receiver close success")
 
 }
+
+//func demo() {
+//	stream, err := a.logicClients[index].OnMessage(ctx, reqs)
+//	if err != nil {
+//		a.logicMsgs[index].msgReq <- req
+//		a.GetLog().Errorf("stream :OnMessage init is error:%s", err)
+//		err = nil
+//		time.Sleep(time.Second * 1)
+//	}
+//	err = stream.Send(req)
+//	if err != nil {
+//		a.GetLog().Errorf("ListStr get stream err: %v", err)
+//		continue
+//	}
+//	resp, err := stream.CloseAndRecv()
+
+//for _, v := range resp.Msgs {
+//msg := event.GetQueueMsg()
+//msg.Data.Type = protocol.Type_ACK
+//msg.SetId(v.SendId)
+//user, ok := a.GetBucket(userId(v.SendId)).users[userId(v.SendId)]
+//if !ok {
+//continue
+//}
+//user.Push(ctx, msg)
+//}
+//time.Sleep(time.Millisecond * 50)
+//}

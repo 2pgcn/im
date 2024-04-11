@@ -58,6 +58,9 @@ func PutQueueMsg(m *QueueMsg) {
 		msgPool.Put(m.Data)
 		m.Data = nil
 	}
+	m.id = ""
+	m.traceName = ""
+	clear(m.H)
 	queueMsgPool.Put(m)
 }
 

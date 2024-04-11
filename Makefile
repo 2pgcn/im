@@ -26,9 +26,9 @@ conf:
 		   --proto_path=./third_party \
 		   --go_out=paths=source_relative:./conf \
 		   $(CONF_PROTO_FILES)
-	make benchmark
-.PHONY: benchmark
-benchmark:
+	make benchmarkconf
+.PHONY: benchmarkconf
+benchmarkconf:
 	protoc --proto_path=./benchmark \
     	   --go_out=paths=source_relative:./benchmark \
     		$(BENCH_PROTO_FILES)
@@ -94,3 +94,8 @@ buildcomet:
 build:
 	make buildlogic
 	make buildcomet
+
+.PHONY: benchmark
+benchmark:
+	make comet
+	make logic
