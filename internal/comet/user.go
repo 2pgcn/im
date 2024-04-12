@@ -31,6 +31,7 @@ type User struct {
 	pool        *safe.GoPool
 	msgQueueLen int64
 	msgQueue    chan event.Event
+	allRecvMsg  int64
 }
 
 func NewUser(ctx context.Context, conn *net.TCPConn, log gamelog.GameLog) *User {
@@ -51,7 +52,6 @@ func (u *User) Push(ctx context.Context, m event.Event) (err error) {
 }
 
 func (u *User) Pops(ctx context.Context) chan event.Event {
-
 	return u.msgQueue
 
 }
@@ -66,11 +66,10 @@ func (u *User) Start() {
 			case msgEvent := <-u.Pops(ctx):
 				msgEvents := []event.Event{msgEvent}
 				l := atomic.LoadInt64(&u.msgQueueLen)
-				for i := 0; i < int(l); i++ {
+				for i := 1; i < int(l); i++ {
 					msgEvents = append(msgEvents, <-u.Pops(ctx))
 				}
 				atomic.AddInt64(&u.msgQueueLen, int64(len(msgEvents))*-1)
-
 				for _, v := range msgEvents {
 					writeProto, err := v.ToProtocol()
 					if err != nil {

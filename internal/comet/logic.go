@@ -5,7 +5,6 @@ import (
 	"github.com/2pgcn/gameim/api/logic"
 	"github.com/2pgcn/gameim/conf"
 	"github.com/2pgcn/gameim/pkg/event"
-	"github.com/2pgcn/gameim/pkg/gamelog"
 	"strconv"
 )
 
@@ -31,11 +30,11 @@ func NewLogicClientTest(ctx context.Context, c *conf.Sock) (LogicInterface, erro
 }
 
 func (t *LogicTest) OnMessage(ctx context.Context, e []event.Event) (failEvent []event.Event, err error) {
-	gamelog.GetGlobalog().Debug(len(e))
-	for _, v := range e {
+	for k, v := range e {
 		err = t.producer.Send(ctx, v)
-		failEvent = append(failEvent, v)
-		return
+		if err != nil {
+			return e[k:], err
+		}
 	}
 	return
 }

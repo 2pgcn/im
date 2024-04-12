@@ -19,6 +19,7 @@ import (
 	_ "net/http/pprof"
 	"os"
 	"os/signal"
+	"runtime"
 	"runtime/pprof"
 	"strconv"
 )
@@ -34,6 +35,7 @@ var rootCmd = &cobra.Command{
 	Long:    `implementing game im comet in go`,
 	Version: strconv.Itoa(int(protocol.Version)),
 	Run: func(cmd *cobra.Command, args []string) {
+		runtime.GOMAXPROCS(runtime.NumCPU())
 		//trace_conf.SetTraceConfig(cometConfig.UpData.TraceConf)
 		//if err := startTrace(); err != nil {
 		//	panic(err)
@@ -42,7 +44,15 @@ var rootCmd = &cobra.Command{
 		//	panic(err)
 		//
 		//}
-
+		cf, err := os.Create("/tmp/gameim-comet-0.cpu")
+		if err != nil {
+			panic(err)
+		}
+		defer func() {
+			pprof.StopCPUProfile()
+			cf.Close()
+		}()
+		pprof.StartCPUProfile(cf)
 		cometConfig := conf.InitCometConfig(CfgFile)
 		//todo add to conf
 		l := gamelog.GetZapLog(zapcore.InfoLevel, 2)

@@ -92,6 +92,11 @@ const (
 	seqSizeOffset      = opSizeOffset + seqSize
 )
 
+var (
+	AllRecvCount int64 = 0
+	AllSendCount int64 = 0
+)
+
 func (p *Proto) Reset() {
 	p.Version = 1
 	p.Op = 0
@@ -162,8 +167,9 @@ func (p *Proto) WriteTcpNotFlush(writer *bufio.Writer) (err error) {
 }
 
 func (p *Proto) DecodeFromBytes(b *bufio.Reader) (err error) {
-	headBuf := headerPool.Get().([]byte)
-	defer headerPool.Put(headBuf)
+	//headBuf := headerPool.Get().([]byte)
+	//defer headerPool.Put(headBuf)
+	headBuf := make([]byte, HeaderLen)
 	if err = binary.Read(b, binary.BigEndian, &headBuf); err != nil {
 		return
 	}
@@ -182,7 +188,6 @@ func (p *Proto) DecodeFromBytes(b *bufio.Reader) (err error) {
 	if err = binary.Read(b, binary.BigEndian, &p.Data); err != nil {
 		return
 	}
-
 	return
 }
 

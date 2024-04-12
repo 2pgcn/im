@@ -76,24 +76,18 @@ func NewServer(ctx context.Context, c *conf.CometConfig, gopool *safe.GoPool, lo
 func (s *Server) bindConn(ctx context.Context, host string, c *conf.TcpMsg) {
 	var addr *net.TCPAddr
 	var listener *net.TCPListener
-	var conn *net.TCPConn
 	var err error
 	if addr, err = net.ResolveTCPAddr("tcp", host); err != nil {
 		s.GetLog().Errorf("net.ResolveTCPAddr(tcp, %s) error(%v)", host, err)
 		return
 	}
-
 	if listener, err = net.ListenTCP("tcp", addr); err != nil {
 		s.GetLog().Errorf("net.ListenTCP(tcp, %s) error(%v)", addr, err)
 		return
 	}
 	s.listens = append(s.listens, listener)
-	//var conn *net.TCPConn
-	//var err error
-	//raddr := net.UnixAddr{Name: "", Net: "unix"}
-	//listenUnix, err := net.ListenUnix("unix", &raddr)
 	for {
-		conn, err = listener.AcceptTCP()
+		conn, err := listener.AcceptTCP()
 		if err != nil {
 			if !errors.Is(err, net.ErrClosed) {
 				s.log.Infof("listener is close: accept:%s", err.Error())

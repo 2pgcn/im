@@ -15,18 +15,14 @@ import (
 	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
-	"math/rand"
 	"net"
-	"runtime"
 	"strconv"
 	"sync/atomic"
-	"time"
 )
 
 var log *zap.SugaredLogger
 
 func benchComet(ctx context.Context, addr string, num int) {
-	runtime.GOMAXPROCS(runtime.NumCPU())
 	flag.Parse()
 	log = zap.NewExample().Sugar()
 	begin := 1
@@ -39,15 +35,10 @@ func benchComet(ctx context.Context, addr string, num int) {
 }
 
 func clients(ctx context.Context, addr string, mid int64) {
-	for {
-		startClient(ctx, addr, mid)
-		time.Sleep(time.Duration(rand.Intn(10)) * time.Second)
-	}
+	startClient(ctx, addr, mid)
 }
 
 func startClient(ctx context.Context, addr string, key int64) {
-	gamelog.GetGlobalog().Info(key)
-
 	//time.Sleep(time.Duration(rand.Intn(120)) * time.Second)
 	atomic.AddInt64(&aliveCount, 1)
 	defer atomic.AddInt64(&aliveCount, -1)
@@ -77,12 +68,10 @@ func startClient(ctx context.Context, addr string, key int64) {
 		panic(err)
 	}
 	p.Data = data
-	log.Infof("auth start,p%v", p)
 	if err = p.WriteTcp(wr); err != nil {
 		log.Errorf("tcpWriteProto() error(%v)", err)
 		return
 	}
-	log.Infof("auth success")
 	for {
 		if err = p.DecodeFromBytes(rd); err == nil && p.Op == protocol.OpAuthReply {
 			log.Infof("key:%d auth ok, p: %v", strconv.FormatInt(key, 10), p)
@@ -110,7 +99,7 @@ func startClient(ctx context.Context, addr string, key int64) {
 
 	go func() {
 		for {
-			if err = hbProto.WriteTcp(wr); err != nil {
+			if err := hbProto.WriteTcp(wr); err != nil {
 				log.Errorf("key:%d tcpWriteProto() error(%v)", key, err)
 				return
 			}
@@ -119,15 +108,13 @@ func startClient(ctx context.Context, addr string, key int64) {
 	}()
 	//log.Infof("key:%d send msg %+v", key, hbProto)
 	seq++
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			if err = p.DecodeFromBytes(rd); err != nil {
+	go func() {
+		for {
+			if err := p.DecodeFromBytes(rd); err != nil {
 				gamelog.GetGlobalog().Error(err)
+				return
 			}
 			addCountDown(1)
 		}
-	}
+	}()
 }

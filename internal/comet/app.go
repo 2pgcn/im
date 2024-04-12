@@ -102,22 +102,21 @@ func (a *App) Start() error {
 					return
 					//一次发送1/3
 				case req := <-a.logicMsgs[index].msgReq:
-					var reqs []event.Event
+					evMsg := event.GetQueueMsg()
+					evMsg.Data = req
+					evMsg.SetId(strconv.Itoa(int(req.Msgid)))
+					var reqs = []event.Event{evMsg}
+
 					ctx, _ := context.WithTimeout(ctx, time.Second*3)
 					num := min(atomic.LoadInt64(&a.logicMsgs[index].len), int64(defaultMessageReqLens/8))
-					for i := 0; i < int(num+1); i++ {
+					for i := 1; i < int(num); i++ {
 						evMsg := event.GetQueueMsg()
-						if i == 0 {
-							evMsg.Data = req
-							evMsg.SetId(strconv.Itoa(int(req.Msgid)))
-						} else {
-							v := <-a.logicMsgs[index].msgReq
-							evMsg.SetId(strconv.Itoa(int(v.Msgid)))
-							evMsg.Data = v
-						}
+						v := <-a.logicMsgs[index].msgReq
+						evMsg.SetId(strconv.Itoa(int(v.Msgid)))
+						evMsg.Data = v
 						reqs = append(reqs, evMsg)
 					}
-					atomic.AddInt64(&a.logicMsgs[index].len, (num+1)*-1)
+					atomic.AddInt64(&a.logicMsgs[index].len, int64(len(reqs)*-1))
 					//由于异步,所有消息会回ack,固重试1次后丢弃
 					failReqs, err := a.logicClients[index].OnMessage(ctx, reqs)
 					if err != nil {
@@ -158,7 +157,7 @@ func (a *App) AddUser(token string, conn *net.TCPConn, br *bufio.Reader, bw *buf
 		p.Reset()
 		p.Op = protocol.OpAuthReply
 		if err = p.WriteTcp(user.WriteBuf); err != nil {
-			a.GetLog().Debugf("write proto err:%s", err)
+			a.GetLog().Infof("write proto err:%s", err)
 			return
 		}
 		//启动用户获取自己msg
@@ -208,8 +207,9 @@ func (a *App) AddUser(token string, conn *net.TCPConn, br *bufio.Reader, bw *buf
 				if p.Op == protocol.OpSendMsg {
 					sendType = protocol.Type_PUSH
 				}
-				atomic.AddInt64(&a.logicMsgs[rand.Intn(defaultLogicLens)].len, 1)
-				a.logicMsgs[rand.Intn(defaultLogicLens)].msgReq <- &protocol.Msg{
+				index := rand.Intn(defaultLogicLens)
+				atomic.AddInt64(&a.logicMsgs[index].len, 1)
+				a.logicMsgs[index].msgReq <- &protocol.Msg{
 					Type:   sendType,
 					ToId:   msgP.ToId,
 					SendId: string(user.Uid),
@@ -252,12 +252,13 @@ func (a *App) queueHandle() (err error) {
 					case protocol.Type_PUSH:
 						bucket := a.GetBucket(userId(msg.Data.GetToId()))
 						if user, ok := bucket.users[userId(msg.Data.GetToId())]; ok {
-							err = user.Push(a.ctx, m)
+							err := user.Push(a.ctx, m)
 							if err != nil {
 								a.GetLog().Errorf("user.Push error:%s", err.Error())
 							}
 						} else {
 							a.GetLog().Infof("user not exist:%d", msg.Data.GetToId())
+							continue
 						}
 					case protocol.Type_ROOM, protocol.Type_APP:
 						a.broadcast(m)
@@ -280,20 +281,22 @@ func (a *App) broadcast(c event.Event) {
 }
 
 func (a *App) Close() {
+	a.ctx.Done()
 	msg := event.GetQueueMsg()
 	msg.Data.Type = protocol.Type_CLOSE
 	a.broadcast(msg)
 	a.GetLog().Debug("app broadcast close success")
-	for _, v := range a.Buckets {
-		v.Close()
-	}
 	err := a.receiver.Close()
-	if err != nil {
-		a.GetLog().Errorf("%s:", err.Error())
-	}
 	for i := 0; i < len(a.logicClients); i++ {
 		close(a.logicMsgs[i].msgReq)
 	}
+	for _, v := range a.Buckets {
+		v.Close()
+	}
+	if err != nil {
+		a.GetLog().Errorf("%s:", err.Error())
+	}
+
 	a.GetLog().Debug("app receiver close success")
 
 }

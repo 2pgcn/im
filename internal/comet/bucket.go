@@ -1,7 +1,6 @@
 package comet
 
 import (
-	"container/heap"
 	"context"
 	"github.com/2pgcn/gameim/api/protocol"
 	"github.com/2pgcn/gameim/pkg/event"
@@ -72,13 +71,13 @@ func (b *Bucket) PutUser(user *User) {
 		user.Room = room
 	}
 	room.JoinRoom(user)
-	heap.Push(b.heartHeap, &HeapItem{
-		Id:   (user.Uid),
-		Time: time.Now().Add(time.Second * 30),
-		fn: func() {
-			user.Close()
-		},
-	})
+	//heap.Push(b.heartHeap, &HeapItem{
+	//	Id:   user.Uid,
+	//	Time: time.Now().Add(time.Second * 30),
+	//	fn: func() {
+	//		user.Close()
+	//	},
+	//})
 	return
 }
 
