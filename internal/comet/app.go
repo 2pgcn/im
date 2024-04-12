@@ -251,7 +251,10 @@ func (a *App) queueHandle() (err error) {
 					switch msg.Data.Type {
 					case protocol.Type_PUSH:
 						bucket := a.GetBucket(userId(msg.Data.GetToId()))
-						if user, ok := bucket.users[userId(msg.Data.GetToId())]; ok {
+						bucket.lock.RLock()
+						user, ok := bucket.users[userId(msg.Data.GetToId())]
+						bucket.lock.RUnlock()
+						if ok {
 							err := user.Push(a.ctx, m)
 							if err != nil {
 								a.GetLog().Errorf("user.Push error:%s", err.Error())

@@ -22,6 +22,7 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"strconv"
+	"time"
 )
 
 var (
@@ -44,15 +45,16 @@ var rootCmd = &cobra.Command{
 		//	panic(err)
 		//
 		//}
-		cf, err := os.Create("/tmp/gameim-comet-0.cpu")
-		if err != nil {
-			panic(err)
-		}
-		defer func() {
-			pprof.StopCPUProfile()
-			cf.Close()
-		}()
-		pprof.StartCPUProfile(cf)
+		time.Sleep(time.Second)
+		//cf, err := os.Create("/tmp/gameim-comet-0.cpu")
+		//if err != nil {
+		//	panic(err)
+		//}
+		//defer func() {
+		//	pprof.StopCPUProfile()
+		//	cf.Close()
+		//}()
+		//pprof.StartCPUProfile(cf)
 		cometConfig := conf.InitCometConfig(CfgFile)
 		//todo add to conf
 		l := gamelog.GetZapLog(zapcore.InfoLevel, 2)

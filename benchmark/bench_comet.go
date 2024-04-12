@@ -15,6 +15,9 @@ import (
 	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
+	"math/rand"
+	"time"
+
 	"net"
 	"strconv"
 	"sync/atomic"
@@ -39,7 +42,7 @@ func clients(ctx context.Context, addr string, mid int64) {
 }
 
 func startClient(ctx context.Context, addr string, key int64) {
-	//time.Sleep(time.Duration(rand.Intn(120)) * time.Second)
+	time.Sleep(time.Duration(rand.Intn(120)) * time.Second)
 	atomic.AddInt64(&aliveCount, 1)
 	defer atomic.AddInt64(&aliveCount, -1)
 	// connnect to server
@@ -74,7 +77,6 @@ func startClient(ctx context.Context, addr string, key int64) {
 	}
 	for {
 		if err = p.DecodeFromBytes(rd); err == nil && p.Op == protocol.OpAuthReply {
-			log.Infof("key:%d auth ok, p: %v", strconv.FormatInt(key, 10), p)
 			break
 		}
 	}
@@ -99,6 +101,7 @@ func startClient(ctx context.Context, addr string, key int64) {
 
 	go func() {
 		for {
+			time.Sleep(time.Second * 1)
 			if err := hbProto.WriteTcp(wr); err != nil {
 				log.Errorf("key:%d tcpWriteProto() error(%v)", key, err)
 				return
