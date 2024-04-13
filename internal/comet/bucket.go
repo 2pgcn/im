@@ -53,24 +53,23 @@ func (b *Bucket) StartBucket() {
 }
 
 func (b *Bucket) PutUser(user *User) {
-	b.lock.Lock()
-	b.users[user.Uid] = user
-	b.onlineUserNum++
-	b.lock.Unlock()
-
 	var room *Room
 	var ok bool
 
+	b.lock.Lock()
+	b.users[user.Uid] = user
+	room, ok = b.rooms[user.RoomId]
+	b.onlineUserNum++
+	b.lock.Unlock()
+
 	user.lock.Lock()
 	defer user.lock.Unlock()
-	if user.RoomId != "" {
-		if room, ok = b.rooms[user.RoomId]; !ok {
-			room = NewRoom(user.RoomId)
-			b.rooms[user.RoomId] = room
-		}
-		user.Room = room
+	//roomid存在,但bucker里无room,自动创建
+	if user.RoomId != "" && !ok {
+		room = NewRoom(user.RoomId)
+		room.JoinRoom(user)
+		b.rooms[user.RoomId] = room
 	}
-	room.JoinRoom(user)
 	//heap.Push(b.heartHeap, &HeapItem{
 	//	Id:   user.Uid,
 	//	Time: time.Now().Add(time.Second * 30),
@@ -84,12 +83,12 @@ func (b *Bucket) PutUser(user *User) {
 func (b *Bucket) DeleteUser(uid userId) {
 	b.lock.RLock()
 	user, ok := b.users[uid]
-	if !ok {
+	room, ok1 := b.rooms[user.RoomId]
+	if !ok || !ok1 {
 		//已经退出
 		b.lock.RUnlock()
 		return
 	}
-	room := b.rooms[user.RoomId]
 	room.ExitRoom(user.Uid)
 	b.lock.RUnlock()
 

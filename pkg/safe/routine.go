@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/cenkalti/backoff/v4"
-	"runtime"
 	"runtime/debug"
 	"sync"
 	"sync/atomic"
@@ -17,11 +16,9 @@ type routineCtx func(ctx context.Context)
 // GoPool todo add name,for debug
 // Pool is a pool of go routines.
 type GoPool struct {
-	waitGroup    sync.WaitGroup
-	ctx          context.Context
-	cancel       context.CancelFunc
-	poolnames    sync.Map
-	isDebugStack bool
+	waitGroup sync.WaitGroup
+	ctx       context.Context
+	cancel    context.CancelFunc
 	//for debug
 	curNum int64
 	name   string
@@ -35,22 +32,14 @@ func NewGoPool(parentCtx context.Context, name string) *GoPool {
 		cancel: cancel,
 		name:   name,
 		//pro close
-		isDebugStack: true,
 	}
 }
 
 // GoCtx starts a recoverable goroutine with a context.
 func (p *GoPool) GoCtx(goroutine routineCtx) {
 	p.waitGroup.Add(1)
-	key := ""
-	if p.isDebugStack {
-		_, file, line, _ := runtime.Caller(1)
-		key = fmt.Sprintf("%s:%d", file, line)
-		p.poolnames.Store(key, true)
-	}
 	Go(func() {
 		defer p.waitGroup.Done()
-		defer p.poolnames.Delete(key)
 		atomic.AddInt64(&p.curNum, 1)
 		goroutine(p.ctx)
 		atomic.AddInt64(&p.curNum, -1)
@@ -64,11 +53,6 @@ func (p *GoPool) Stop() {
 		for {
 			time.Sleep(time.Second * 30)
 			gamelog.GetGlobalog().Infof("pool(%v) Waiting for all goroutines to finish,cur num(%d)", p.name, atomic.LoadInt64(&p.curNum))
-			p.poolnames.Range(func(key, value any) bool {
-				gamelog.GetGlobalog().Info(key)
-				return true
-			})
-
 		}
 	})
 	p.waitGroup.Wait()

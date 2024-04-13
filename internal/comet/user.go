@@ -107,7 +107,7 @@ func (u *User) Close() {
 	defer u.lock.Unlock()
 	err = u.conn.CloseRead()
 	if err != nil && !errors.Is(err, net.ErrClosed) {
-		u.log.Errorf("close error %s", err.Error())
+		u.log.Debugf("close error %s", err.Error())
 	}
 }
 

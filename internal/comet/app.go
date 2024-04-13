@@ -170,6 +170,7 @@ func (a *App) AddUser(token string, conn *net.TCPConn, br *bufio.Reader, bw *buf
 			err = p.DecodeFromBytes(user.ReadBuf)
 			if err != nil {
 				gamelog.GetGlobalog().Debugf("client DecodeFromBytes error,%s", err)
+				err = nil
 				return
 			}
 			//msgCtx, span := trace_conf.SetTrace(context.Background(), trace_conf.COMET_RECV_CIENT_MSG,

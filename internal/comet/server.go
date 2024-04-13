@@ -85,7 +85,9 @@ func (s *Server) bindConn(ctx context.Context, host string, c *conf.TcpMsg) {
 		s.GetLog().Errorf("net.ListenTCP(tcp, %s) error(%v)", addr, err)
 		return
 	}
+	s.Lock.Lock()
 	s.listens = append(s.listens, listener)
+	s.Lock.Unlock()
 	for {
 		conn, err := listener.AcceptTCP()
 		if err != nil {

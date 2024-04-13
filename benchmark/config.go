@@ -5,12 +5,10 @@ import (
 	"github.com/go-kratos/kratos/v2/config/file"
 )
 
-var flagconf string
-
 func getBenchConfig() *BenchConf {
 	c := config.New(
 		config.WithSource(
-			file.NewSource(flagconf),
+			file.NewSource(cpath),
 		),
 	)
 	defer c.Close()

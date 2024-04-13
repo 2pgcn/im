@@ -60,7 +60,7 @@ comet:
 	go run -race  ./cmd/comet/... --conf=$(BASEPATH)/conf/comet.yaml
 .PHONY: logic
 logic:
-	go run -race ./cmd/logic/... -conf=$(BASEPATH)/conf/logic.yaml
+	go run ./cmd/logic/... -conf=$(BASEPATH)/conf/logic.yaml
 .PHONY: buildimage
 buildimage:
 	docker buildx build --platform linux/amd64 -f ./Dockerfile --push  -t registry.cn-shenzhen.aliyuncs.com/pg/gameim:$(GAMEIMVERSION) ./

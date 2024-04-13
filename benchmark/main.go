@@ -17,6 +17,7 @@ var c *BenchConf
 
 var address string
 var num int
+var cpath string
 
 func initLog() {
 	l := gamelog.GetZapLog(zapcore.DebugLevel, 2)
@@ -32,15 +33,16 @@ func main() {
 	initLog()
 	cmd := NewServerArgs()
 	cmd.SetContext(ctx)
+	cmd.PersistentFlags().StringVar(&cpath, "cpath", "~/go/src/github.com/2pgcn/gameim/benchmark/conf.yaml", "cpath eg:10")
 	cmd.PersistentFlags().StringVar(&address, "address", "", "address eg:127.0.0.1:9000")
-	cmd.PersistentFlags().StringVar(&flagconf, "conf", "/Users/pg/work/go/src/github.com/2pgcn/gameim/benchmark/conf.yaml", "address eg:10")
 	cmd.PersistentFlags().IntVar(&num, "num", 1, "address eg:10")
+	err := cmd.Execute()
+
 	c = getBenchConfig()
 	//pprof.InitPyroscope("benchmark", "1.0.0", c.GetPyroscope().GetAddress(), gamelog.GetGlobalog())
 
 	exitChan := make(chan os.Signal, 1)
 	signal.Notify(exitChan, os.Kill, os.Interrupt)
-	err := cmd.Execute()
 	if err != nil {
 		panic(err)
 	}

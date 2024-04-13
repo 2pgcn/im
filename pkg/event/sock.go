@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"github.com/2pgcn/gameim/conf"
 	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/2pgcn/gameim/pkg/safe"
+	"io"
 	"math/rand"
 	"net"
 	"time"
@@ -84,6 +86,10 @@ func NewSockReceiver(con *conf.Sock) (*SockReceiver, error) {
 		for {
 			conn, err := listenUnix.AcceptUnix()
 			if err != nil {
+				//golang issue https://github.com/golang/go/issues/4373
+				if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+					return
+				}
 				//todo,写入fin msg关闭conn,而不是关闭listenUnix退出
 				gamelog.GetGlobalog().Errorf("queue sock accept error:%", err)
 				return
@@ -94,6 +100,9 @@ func NewSockReceiver(con *conf.Sock) (*SockReceiver, error) {
 				for {
 					err := binary.Read(redBuf, binary.BigEndian, head[:])
 					if err != nil {
+						if errors.Is(err, io.EOF) {
+							return
+						}
 						gamelog.GetGlobalog().Errorf("queue sock binary.Read error:%", err)
 						continue
 					}
@@ -132,7 +141,7 @@ func (r *SockReceiver) Commit(ctx context.Context, event Event) error {
 	return nil
 }
 
-// 本地测试使用,未优雅退出,如处理掉SockReceiver里消息
+// Close 本地测试使用,未优雅退出,如处理掉SockReceiver里消息
 func (r *SockReceiver) Close() error {
 	return r.client.Close()
 }
