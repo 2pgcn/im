@@ -68,7 +68,9 @@ func (b *Bucket) PutUser(user *User) {
 	if user.RoomId != "" && !ok {
 		room = NewRoom(user.RoomId)
 		room.JoinRoom(user)
+		b.lock.Lock()
 		b.rooms[user.RoomId] = room
+		b.lock.Unlock()
 	}
 	//heap.Push(b.heartHeap, &HeapItem{
 	//	Id:   user.Uid,
