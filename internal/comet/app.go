@@ -151,7 +151,9 @@ func (a *App) AddUser(token string, conn *net.TCPConn, br *bufio.Reader, bw *buf
 		user.WriteBuf = bw
 		user.Uid = userId(authReply.Uid)
 		user.RoomId = roomId(authReply.RoomId)
+		a.lock.RLock()
 		bucket := a.GetBucket(user.Uid)
+		a.lock.RUnlock()
 		bucket.PutUser(user)
 		defer bucket.DeleteUser(user.Uid)
 		p.Reset()

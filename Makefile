@@ -57,7 +57,7 @@ generate:
 	go generate ./... -mod=vendor
 .PHONY: srv
 comet:
-	go run -race  ./cmd/comet/... --conf=$(BASEPATH)/conf/comet.yaml
+	go run   ./cmd/comet/... --conf=$(BASEPATH)/conf/comet.yaml
 .PHONY: logic
 logic:
 	go run ./cmd/logic/... -conf=$(BASEPATH)/conf/logic.yaml

@@ -9,6 +9,7 @@ import (
 	"github.com/2pgcn/gameim/pkg/gamelog"
 	"github.com/2pgcn/gameim/pkg/safe"
 	"net"
+	"os"
 	"sync"
 	"sync/atomic"
 )
@@ -63,6 +64,7 @@ func (u *User) Start() {
 			select {
 			case <-ctx.Done():
 				return
+				os.Exit(1)
 			case msgEvent := <-u.Pops(ctx):
 				msgEvents := []event.Event{msgEvent}
 				l := atomic.LoadInt64(&u.msgQueueLen)
