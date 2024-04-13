@@ -16,6 +16,9 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 	"math/rand"
+	"runtime"
+	"sync"
+	"syscall"
 	"time"
 
 	"net"
@@ -24,7 +27,30 @@ import (
 )
 
 var log *zap.SugaredLogger
+var interfaceNames []string = []string{"eth0", "eth1"} // ens33、ens160
 
+var ds = []*net.Dialer{}
+
+var once = sync.Once{}
+
+func init() {
+	once.Do(func() {
+		if runtime.GOOS == "linux" {
+			for _, v := range interfaceNames {
+				d := &net.Dialer{
+					Control: func(network, address string, c syscall.RawConn) error {
+						return setSocketOptions(network, address, c, v)
+					},
+				}
+				ds = append(ds, d)
+			}
+		} else {
+			ds = append(ds, &net.Dialer{})
+		}
+	})
+}
+
+// only tcp and linux
 func benchComet(ctx context.Context, addr string, num int) {
 	flag.Parse()
 	log = zap.NewExample().Sugar()
@@ -46,7 +72,8 @@ func startClient(ctx context.Context, addr string, key int64) {
 	atomic.AddInt64(&aliveCount, 1)
 	defer atomic.AddInt64(&aliveCount, -1)
 	// connnect to server
-	conn, err := net.Dial("tcp", addr)
+	conn, err := ds[int(key)%len(ds)].Dial("tcp", addr)
+	//conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		log.Errorf("net.Dial(%s) error(%v)", address, err)
 		return
