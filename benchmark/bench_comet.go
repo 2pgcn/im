@@ -16,39 +16,15 @@ import (
 	"github.com/golang/protobuf/proto"
 	"go.uber.org/zap"
 	"math/rand"
-	"runtime"
-	"sync"
-	"syscall"
+	"net"
 	"time"
 
-	"net"
 	"strconv"
 	"sync/atomic"
 )
 
 var log *zap.SugaredLogger
-var interfaceNames []string = []string{"eth0", "eth1"} // ens33、ens160
-
-var ds = []*net.Dialer{}
-
-var once = sync.Once{}
-
-func init() {
-	once.Do(func() {
-		if runtime.GOOS == "linux" {
-			for _, v := range interfaceNames {
-				d := &net.Dialer{
-					Control: func(network, address string, c syscall.RawConn) error {
-						return setSocketOptions(network, address, c, v)
-					},
-				}
-				ds = append(ds, d)
-			}
-		} else {
-			ds = append(ds, &net.Dialer{})
-		}
-	})
-}
+var interfaceNames []string = []string{"en0"} // ens33、ens160
 
 // only tcp and linux
 func benchComet(ctx context.Context, addr string, num int) {
@@ -68,11 +44,29 @@ func clients(ctx context.Context, addr string, mid int64) {
 }
 
 func startClient(ctx context.Context, addr string, key int64) {
-	time.Sleep(time.Duration(rand.Intn(120)) * time.Second)
+	//time.Sleep(time.Duration(rand.Intn(120)) * time.Second)
 	atomic.AddInt64(&aliveCount, 1)
 	defer atomic.AddInt64(&aliveCount, -1)
 	// connnect to server
-	conn, err := ds[int(key)%len(ds)].Dial("tcp", addr)
+	index := rand.Intn(len(interfaceNames))
+	ief, err := net.InterfaceByName(interfaceNames[index])
+	if err != nil {
+		log.Fatal(err)
+	}
+	addrs, err := ief.Addrs()
+	if err != nil {
+		log.Fatal(err)
+	}
+	//取最后一个,有ipv6地址
+	laddr := &net.TCPAddr{
+		IP: addrs[len(addrs)-1].(*net.IPNet).IP,
+	}
+	raddr, err := net.ResolveTCPAddr("tcp4", addr)
+	if err != nil {
+		panic(err)
+	}
+	conn, err := net.DialTCP("tcp", laddr, raddr)
+	//defer conn.Close()
 	//conn, err := net.Dial("tcp", addr)
 	if err != nil {
 		log.Errorf("net.Dial(%s) error(%v)", address, err)
