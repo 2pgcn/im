@@ -24,7 +24,7 @@ import (
 )
 
 var log *zap.SugaredLogger
-var interfaceNames []string = []string{"en0"} // ens33、ens160
+var interfaceNames []string = []string{"eth0", "eth1", "eth2", "eth3", "eth4", "eth5"} // ens33、ens160
 
 // only tcp and linux
 func benchComet(ctx context.Context, addr string, num int) {
