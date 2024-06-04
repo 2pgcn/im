@@ -33,7 +33,7 @@ func main() {
 	initLog()
 	cmd := NewServerArgs()
 	cmd.SetContext(ctx)
-	cmd.PersistentFlags().StringVar(&cpath, "cpath", "~/go/src/github.com/2pgcn/gameim/benchmark/conf.yaml", "cpath eg:10")
+	cmd.PersistentFlags().StringVar(&cpath, "cpath", "/Users/pg/work/go/src/github.com/2pgcn/gameim/benchmark/conf.yaml", "cpath eg:10")
 	cmd.PersistentFlags().StringVar(&address, "address", "", "address eg:127.0.0.1:9000")
 	cmd.PersistentFlags().IntVar(&num, "num", 1, "address eg:10")
 	err := cmd.Execute()

@@ -7,7 +7,7 @@ require (
 	github.com/go-kratos/kratos/contrib/registry/kubernetes/v2 v2.0.0-20231113102135-421dbc7dae0f
 	github.com/go-kratos/kratos/v2 v2.7.3
 	github.com/go-sql-driver/mysql v1.7.1
-	github.com/golang/protobuf v1.5.3
+	github.com/golang/protobuf v1.5.4
 	github.com/google/wire v0.5.0
 	github.com/grafana/pyroscope-go v1.1.1
 	github.com/nsqio/go-nsq v1.1.0
@@ -24,7 +24,7 @@ require (
 	go.uber.org/automaxprocs v1.5.3
 	go.uber.org/zap v1.24.0
 	google.golang.org/grpc v1.62.1
-	google.golang.org/protobuf v1.32.0
+	google.golang.org/protobuf v1.33.0
 	gorm.io/driver/mysql v1.5.2
 	gorm.io/gorm v1.25.5
 	gorm.io/plugin/dbresolver v1.4.7

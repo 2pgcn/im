@@ -164,11 +164,11 @@ type NsqReceiver struct {
 func NewNsqReceiver(c *conf.Nsq) (r *NsqReceiver, err error) {
 	consumerConfig := nsq.NewConfig()
 	consumer, err := nsq.NewConsumer(c.GetTopic(), c.GetChannel(), consumerConfig)
-	consumer.SetLogger(gamelog.GetGlobalNsqLog(), nsq.LogLevelWarning)
+	//	consumer.SetLogger(gamelog.GetGlobalNsqLog(), nsq.LogLevelWarning)
 	if err != nil {
 		return nil, err
 	}
-	consumer.ChangeMaxInFlight(8096)
+	consumer.ChangeMaxInFlight(2048)
 	r = &NsqReceiver{}
 	r.gopool = safe.NewGoPool(context.Background(), "nsq-receiver")
 

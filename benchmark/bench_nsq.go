@@ -14,9 +14,12 @@ import (
 
 func benchNsq(ctx context.Context) {
 	consumer, err := event.NewNsqReceiver(&conf.Nsq{
-		Topic:       c.GetNsq().GetTopic(),
-		Channel:     c.GetNsq().GetChannel(),
-		NsqdAddress: c.GetNsq().GetNsqdAddress(),
+		//Topic:       c.GetNsq().GetTopic(),
+		NsqdAddress: []string{"192.168.31.49:4150"},
+		Topic:       "testTopic",
+		Channel:     "testChannel",
+		//Channel:     c.GetNsq().GetChannel(),
+		//NsqdAddress: c.GetNsq().GetNsqdAddress(),
 	})
 	if err != nil {
 		panic(err)
@@ -26,9 +29,9 @@ func benchNsq(ctx context.Context) {
 		panic(err)
 	}
 	producer, err := event.NewNsqSender(&conf.Nsq{
-		Topic:       c.GetNsq().GetTopic(),
-		Channel:     c.GetNsq().GetChannel(),
-		NsqdAddress: c.GetNsq().GetNsqdAddress(),
+		NsqdAddress: []string{"192.168.31.49:4150"},
+		Topic:       "testTopic",
+		Channel:     "testChannel",
 	})
 	if err != nil {
 		panic(err)
